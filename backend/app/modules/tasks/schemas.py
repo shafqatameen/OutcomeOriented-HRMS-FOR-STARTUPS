@@ -1,0 +1,47 @@
+from pydantic import BaseModel
+from typing import List, Optional
+from datetime import datetime
+
+class CategoryBase(BaseModel):
+    name: str
+    default_points: int
+
+class CategoryCreate(CategoryBase):
+    pass
+
+class CategoryUpdate(BaseModel):
+    name: Optional[str] = None
+    default_points: Optional[int] = None
+
+class Category(CategoryBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+class TaskBase(BaseModel):
+    title: str
+    user_id: int
+    category_id: int
+    milestone_id: Optional[int] = None
+    is_recurring: bool = False
+    points: Optional[int] = None
+
+class TaskCreate(TaskBase):
+    pass
+
+class Task(TaskBase):
+    id: int
+    status: str
+    class Config:
+        from_attributes = True
+
+class PointLedgerBase(BaseModel):
+    user_id: int
+    task_id: Optional[int] = None
+    points_awarded: int
+
+class PointLedger(PointLedgerBase):
+    id: int
+    timestamp: datetime
+    class Config:
+        from_attributes = True

@@ -1,0 +1,86 @@
+//* Token definition for shadcn/ui components
+$background: hsl(var(--background));
+$foreground: hsl(var(--foreground));
+$card: hsl(var(--card));
+$card-foreground: hsl(var(--card-foreground));
+$popover: hsl(var(--popover));
+$popover-foreground: hsl(var(--popover-foreground));
+$primary: hsl(var(--primary));
+$primary-foreground: hsl(var(--primary-foreground));
+$secondary: hsl(var(--secondary));
+$secondary-foreground: hsl(var(--secondary-foreground));
+$muted: hsl(var(--muted));
+$muted-foreground: hsl(var(--muted-foreground));
+$accent: hsl(var(--accent));
+$accent-foreground: hsl(var(--accent-foreground));
+$destructive: hsl(var(--destructive));
+$destructive-foreground: hsl(var(--destructive-foreground));
+$border: hsl(var(--border));
+$input: hsl(var(--input));
+$ring: hsl(var(--ring));
+
+// Base UI variables
+:root {
+  --radius: 0.5rem;
+  --sidebar-background: 0 0% 98%;
+  --sidebar-foreground: 240 5.3% 26.1%;
+  --sidebar-primary: 240 5.9% 10%;
+  --sidebar-primary-foreground: 0 0% 98%;
+  --sidebar-accent: 240 4.8% 95.9%;
+  --sidebar-accent-foreground: 240 5.9% 10%;
+  --sidebar-border: 220 13% 91%;
+  --sidebar-ring: 217.2 91.2% 59.8%;
+}
+
+// Component JSON for shadcn/ui configuration
+{
+  "$schema": "https://schema.components.json",
+  "name": "shadcn/ui components",
+  "author": "shadcn",
+  "description": "A modern component library built with Radix UI and Tailwind CSS.",
+  "components": [
+    {
+      "name": "badge",
+      "title": "Badge",
+      "description": "A small component for displaying status, labels, or counts.",
+      "preview": "badge",
+      "icon": "tag"
+    },
+    {
+      "name": "button",
+      "title": "Button",
+      "description": "A clickable button with various styles and sizes.",
+      "preview": "button",
+      "icon": "button"
+    },
+    {
+      "name": "card",
+      "title": "Card",
+      "description": "A flexible container for grouping related content.",
+      "preview": "card",
+      "icon": "card-grid"
+    },
+    {
+      "name": "dialog",
+      "title": "Dialog",
+      "description": "A modal dialog for user interactions.",
+      "preview": "dialog",
+      "icon": "dialog"
+    },
+    {
+      "name": "input",
+      "title": "Input",
+      "description": "An input field for user text entry.",
+      "preview": "input",
+      "icon": "input"
+    },
+    {
+      "name": "table",
+      "title": "Table",
+      "description": "A data table for displaying structured data.",
+      "preview": "table",
+      "icon": "table"
+    }
+  ],
+  "version": "latest"
+}

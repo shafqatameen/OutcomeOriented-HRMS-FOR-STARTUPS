@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl.exe -s -o /dev/null -w \"status: %{http_code}\\\\n\" http://localhost:8000/goals)",
+      "Bash(curl.exe -s http://localhost:8000/goals)",
+      "Bash(curl.exe -s -o /dev/null -w \"status: %{http_code}\\\\n\" http://localhost:8000/milestones)",
+      "Bash(curl.exe -s -o /dev/null -w \"%{http_code}\\\\n\" -X POST http://localhost:8000/goals -H \"Content-Type: application/json\" -d '{\"title\":\"test\"}')",
+      "Bash(curl.exe -s -o /dev/null -w \"%{http_code}\\\\n\" -X POST http://localhost:8000/milestones -H \"Content-Type: application/json\" -d '{\"title\":\"test\",\"goal_id\":1}')"
+    ]
+  }
+}
