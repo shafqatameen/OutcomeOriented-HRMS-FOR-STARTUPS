@@ -24,6 +24,9 @@ class Task(Base):
     is_recurring = Column(Boolean, default=False)
     status = Column(String, default="Pending")
     points = Column(Integer, nullable=True)
+    # Manual sort order for drag-and-drop. Global across tasks; a reorder only
+    # rewrites the slots already held by the tasks in the request.
+    position = Column(Integer, nullable=False, server_default="0", index=True)
 
     user = relationship("app.modules.users.models.User", back_populates="tasks")
     category = relationship("app.modules.tasks.models.Category", back_populates="tasks")

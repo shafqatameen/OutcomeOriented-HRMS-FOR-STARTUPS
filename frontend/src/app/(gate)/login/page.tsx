@@ -31,8 +31,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="max-w-sm mx-auto space-y-6">
-      <h1 className="text-3xl font-bold">Login</h1>
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold">Login</h1>
       <Card>
         <CardHeader>
           <CardTitle>Sign in</CardTitle>

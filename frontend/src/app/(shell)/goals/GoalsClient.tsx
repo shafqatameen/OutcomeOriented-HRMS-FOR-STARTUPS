@@ -3,25 +3,38 @@ import { useEffect, useState } from "react";
 import { getGoals } from "@/lib/api";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import ContextHeader from "@/components/ContextHeader";
 import { CheckCircle2, Circle } from "lucide-react";
 
-export default function GoalsClient() {
+type GoalsClientProps = {
+  /** When set, show only this goal. Otherwise show every goal. */
+  goalId?: number;
+  /** Resolved server-side so the heading is correct on first paint. */
+  title?: string;
+};
+
+export default function GoalsClient({ goalId, title }: GoalsClientProps) {
   const [goals, setGoals] = useState<any[]>([]);
 
   useEffect(() => {
     getGoals().then(setGoals).catch(console.error);
   }, []);
 
-  return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <h1 className="text-3xl font-bold">Goals</h1>
+  const visibleGoals = goalId === undefined ? goals : goals.filter(g => g.id === goalId);
 
-      {goals.length === 0 ? (
+  return (
+    <div className="space-y-6">
+      <ContextHeader
+        title={title ?? "All Goals"}
+        meta={goalId === undefined && goals.length > 0 ? `${goals.length} goals` : undefined}
+      />
+
+      {visibleGoals.length === 0 ? (
         <Card>
           <CardContent className="text-center text-sm text-slate-500 p-4">No goals yet.</CardContent>
         </Card>
       ) : (
-        goals.map(goal => (
+        visibleGoals.map(goal => (
           <Card key={goal.id}>
             <CardHeader className="flex flex-row justify-between items-center">
               <CardTitle>{goal.title}</CardTitle>

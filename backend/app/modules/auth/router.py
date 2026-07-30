@@ -5,7 +5,7 @@ from app.core.database import get_db
 from app.modules.users import models as user_models
 from app.modules.auth import schemas
 from app.modules.auth.security import verify_password, create_access_token
-from app.modules.auth.dependencies import get_current_user, COOKIE_NAME
+from app.modules.auth.dependencies import get_current_user, granted_keys, COOKIE_NAME
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 COOKIE_MAX_AGE = 60 * 60 * 24 * 7  # seconds, 7 days
@@ -48,8 +48,13 @@ def logout(response: Response):
     return {"message": "Logged out"}
 
 
-@router.get("/me", response_model=schemas.UserOut)
-def me(current_user=Depends(get_current_user)):
+@router.get("/me", response_model=schemas.SessionOut)
+def me(current_user=Depends(get_current_user), db: Session = Depends(get_db)):
     if current_user is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    return current_user
+    return {
+        "id": current_user.id,
+        "name": current_user.name,
+        "role": current_user.role,
+        "permissions": granted_keys(db, current_user),
+    }

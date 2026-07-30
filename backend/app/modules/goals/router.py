@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.core.database import get_db
 from app.modules.goals import models, schemas
-from app.modules.auth.dependencies import require_admin, require_user
+from app.modules.auth.dependencies import require_permission
 
 router = APIRouter(tags=["Goals"])
 
@@ -48,12 +48,12 @@ def _serialize_goal(g: models.Goal) -> dict:
 
 
 @router.get("/goals", response_model=List[schemas.Goal])
-def read_goals(db: Session = Depends(get_db), _user=Depends(require_user)):
+def read_goals(db: Session = Depends(get_db), _user=Depends(require_permission("goals.view"))):
     return [_serialize_goal(g) for g in db.query(models.Goal).all()]
 
 
 @router.post("/goals", response_model=schemas.Goal)
-def create_goal(goal: schemas.GoalCreate, db: Session = Depends(get_db), _admin=Depends(require_admin)):
+def create_goal(goal: schemas.GoalCreate, db: Session = Depends(get_db), _admin=Depends(require_permission("admin.goals"))):
     db_goal = models.Goal(**goal.dict())
     db.add(db_goal)
     db.commit()
@@ -62,12 +62,12 @@ def create_goal(goal: schemas.GoalCreate, db: Session = Depends(get_db), _admin=
 
 
 @router.get("/milestones", response_model=List[schemas.Milestone])
-def read_milestones(db: Session = Depends(get_db), _user=Depends(require_user)):
+def read_milestones(db: Session = Depends(get_db), _user=Depends(require_permission("goals.view"))):
     return [_serialize_milestone(m) for m in db.query(models.Milestone).all()]
 
 
 @router.post("/milestones", response_model=schemas.Milestone)
-def create_milestone(milestone: schemas.MilestoneCreate, db: Session = Depends(get_db), _admin=Depends(require_admin)):
+def create_milestone(milestone: schemas.MilestoneCreate, db: Session = Depends(get_db), _admin=Depends(require_permission("admin.goals"))):
     goal = db.query(models.Goal).filter(models.Goal.id == milestone.goal_id).first()
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
@@ -79,7 +79,7 @@ def create_milestone(milestone: schemas.MilestoneCreate, db: Session = Depends(g
 
 
 @router.patch("/milestones/{milestone_id}", response_model=schemas.Milestone)
-def update_milestone_status(milestone_id: int, update: schemas.MilestoneUpdate, db: Session = Depends(get_db), _admin=Depends(require_admin)):
+def update_milestone_status(milestone_id: int, update: schemas.MilestoneUpdate, db: Session = Depends(get_db), _admin=Depends(require_permission("admin.goals"))):
     db_milestone = db.query(models.Milestone).filter(models.Milestone.id == milestone_id).first()
     if not db_milestone:
         raise HTTPException(status_code=404, detail="Milestone not found")

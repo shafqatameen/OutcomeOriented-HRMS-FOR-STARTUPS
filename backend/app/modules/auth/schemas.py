@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import List
 
 
 class LoginRequest(BaseModel):
@@ -13,6 +14,12 @@ class UserOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class SessionOut(UserOut):
+    """/auth/me. Carries the caller's effective permission keys so the UI can hide
+    what it must not offer - the API still enforces every one of them."""
+    permissions: List[str] = []
 
 
 class LoginOption(BaseModel):

@@ -1,15 +1,99 @@
 "use client";
-import { useEffect, useState } from "react";
-import { getTasks, completeTask, getUsers, getCategories } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import {
+  getTasks,
+  completeTask,
+  getUsers,
+  getCategories,
+  getGoals,
+  getMilestones,
+  reorderTasks,
+  moveTask,
+} from "@/lib/api";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, ListTodo, Flame, History } from "lucide-react";
+import ContextHeader from "@/components/ContextHeader";
+import SortableTaskList, { TaskRow, type SortableTask } from "@/components/SortableTaskList";
+import TaskHistory, { type FilterGoal, type FilterMilestone } from "@/components/TaskHistory";
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCorners,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { cn } from "@/lib/utils";
+import { ListTodo, Flame, Tag, type LucideIcon } from "lucide-react";
 
-export default function TasksClient() {
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
+type Task = SortableTask & {
+  category_id: number | null;
+  milestone_id: number | null;
+  points: number | null;
+};
+
+type Category = { id: number; name: string; default_points: number };
+
+/** Which slice of the board this route shows. */
+export type TasksView =
+  | { kind: "all" }
+  | { kind: "category"; categoryId: number; categoryName: string }
+  | { kind: "history" };
+
+const isCompleted = (task: Task) => task.status === "Completed";
+const isPending = (task: Task) => !isCompleted(task);
+
+const UNCATEGORIZED = "uncategorized";
+const containerIdFor = (categoryId: number | null) =>
+  categoryId === null ? UNCATEGORIZED : `category-${categoryId}`;
+const categoryIdFromContainer = (containerId: string) =>
+  containerId === UNCATEGORIZED ? null : Number(containerId.replace("category-", ""));
+
+/**
+ * Presentational only. Keeps the established glyphs for the two original
+ * categories and falls back to a neutral one for any category added later, so
+ * the board never depends on a category being named a particular thing.
+ */
+const CATEGORY_GLYPHS: Record<string, { icon: LucideIcon; className: string }> = {
+  Adjacent: { icon: ListTodo, className: "w-5 h-5 text-blue-500" },
+  Core: { icon: Flame, className: "w-5 h-5 text-orange-500" },
+};
+const FALLBACK_GLYPH = { icon: Tag, className: "w-5 h-5 text-muted-foreground" };
+
+/**
+ * Rewrites only the slots held by one column, leaving every other task where it
+ * is. Mirrors what PATCH /tasks/reorder does on the server, so the optimistic
+ * order matches what comes back on the next load.
+ */
+function reorderWithinColumn(
+  all: Task[],
+  orderedIds: number[],
+  belongsToColumn: (task: Task) => boolean,
+): Task[] {
+  const columnCount = all.filter(belongsToColumn).length;
+  if (columnCount !== orderedIds.length) return all;
+
+  const byId = new Map(all.map((task) => [task.id, task]));
+  const queue = [...orderedIds];
+
+  return all.map((task) => {
+    if (!belongsToColumn(task)) return task;
+    const nextId = queue.shift();
+    return nextId === undefined ? task : (byId.get(nextId) ?? task);
+  });
+}
+
+export default function TasksClient({ view = { kind: "all" } }: { view?: TasksView }) {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [users, setUsers] = useState<{ id: number; name: string }[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [goals, setGoals] = useState<FilterGoal[]>([]);
+  const [milestones, setMilestones] = useState<FilterMilestone[]>([]);
+  const [reorderError, setReorderError] = useState<string | null>(null);
 
   const loadTasks = () => {
     getTasks().then(setTasks).catch(console.error);
@@ -19,18 +103,21 @@ export default function TasksClient() {
     loadTasks();
     getUsers().then(setUsers).catch(console.error);
     getCategories().then(setCategories).catch(console.error);
+    // Needed for the history filters: milestones carry the goal linkage.
+    getGoals().then(setGoals).catch(console.error);
+    getMilestones().then(setMilestones).catch(console.error);
   }, []);
 
   const getUserName = (userId: number) => {
-    const user = users.find(u => u.id === userId);
+    const user = users.find((u) => u.id === userId);
     return user ? user.name.toUpperCase() : "Unknown";
   };
 
-  const getTaskPoints = (task: any) => {
-    if (task.points !== undefined && task.points !== null) {
-      return task.points;
-    }
-    const cat = categories.find(c => c.id === task.category_id);
+  const getTaskPoints = (task: SortableTask) => {
+    const full = tasks.find((t) => t.id === task.id);
+    if (!full) return 0;
+    if (full.points !== undefined && full.points !== null) return full.points;
+    const cat = categories.find((c) => c.id === full.category_id);
     return cat ? cat.default_points : 0;
   };
 
@@ -43,74 +130,230 @@ export default function TasksClient() {
     }
   };
 
-  return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <h1 className="text-3xl font-bold">Your Tasks</h1>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2">
-            <ListTodo className="w-5 h-5 text-blue-500" />
-            <CardTitle>Daily Habits (Adjacent)</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {tasks.filter(t => t.is_recurring && t.status !== "Completed").map(task => (
-              <div key={task.id} className="flex justify-between items-center p-3 border rounded">
-                <div>
-                  <div className="font-semibold">{task.title} <span className="text-slate-400 font-normal text-sm ml-1">({getTaskPoints(task)}p)</span></div>
-                  <div className="text-sm text-slate-500">Assigned to: {getUserName(task.user_id)}</div>
-                </div>
-                <Button onClick={() => handleComplete(task.id)} className="flex gap-2">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Complete
-                </Button>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2">
-            <Flame className="w-5 h-5 text-orange-500" />
-            <CardTitle>High Impact (Core)</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {tasks.filter(t => !t.is_recurring && t.status !== "Completed").map(task => (
-              <div key={task.id} className="flex justify-between items-center p-3 border rounded">
-                <div>
-                  <div className="font-semibold">{task.title} <span className="text-slate-400 font-normal text-sm ml-1">({getTaskPoints(task)}p)</span></div>
-                  <div className="text-sm text-slate-500">Assigned to: {getUserName(task.user_id)}</div>
-                </div>
-                <Button onClick={() => handleComplete(task.id)} className="flex gap-2">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Complete
-                </Button>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+  const sensors = useSensors(
+    // A small movement threshold keeps a plain click on the handle from
+    // registering as a drag.
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-2">
-          <History className="w-5 h-5 text-gray-500" />
-          <CardTitle>Task History</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {tasks.filter(t => t.status === "Completed").length === 0 ? (
-            <div className="text-center text-sm text-slate-500 p-4">No completed tasks yet.</div>
-          ) : (
-            tasks.filter(t => t.status === "Completed").map(task => (
-              <div key={task.id} className="flex justify-between items-center p-3 border rounded bg-slate-50/50">
-                <div>
-                  <div className="font-semibold line-through text-slate-500">{task.title} <span className="font-normal text-sm ml-1">({getTaskPoints(task)}p)</span></div>
-                  <div className="text-sm text-slate-400">Completed by: {getUserName(task.user_id)}</div>
-                </div>
-                <Badge variant="outline" className="text-green-600 bg-green-50">Done</Badge>
-              </div>
-            ))
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
+  // Snapshot taken at drag start, so a rejected drop can be put back exactly.
+  const dragSnapshot = useRef<{ tasks: Task[]; container: string } | null>(null);
+
+  /** Which column a task currently sits in, treating unknown categories as orphans. */
+  const containerOfTask = (task: Task) =>
+    containerIdFor(categories.some((c) => c.id === task.category_id) ? task.category_id : null);
+
+  /** dnd-kit ids are either a task id (number) or a container id (string). */
+  const containerOfDragId = (dragId: string | number, source: Task[]): string | undefined => {
+    if (typeof dragId === "string") return dragId;
+    const task = source.find((t) => t.id === dragId);
+    return task ? containerOfTask(task) : undefined;
+  };
+
+  const handleDragStart = ({ active }: DragStartEvent) => {
+    const task = tasks.find((t) => t.id === Number(active.id)) ?? null;
+    setActiveTask(task);
+    setReorderError(null);
+    if (task) dragSnapshot.current = { tasks, container: containerOfTask(task) };
+  };
+
+  /** Reassigns the category as you drag across, so the row lands in the hovered column. */
+  const handleDragOver = ({ active, over }: DragOverEvent) => {
+    if (!over) return;
+    const from = containerOfDragId(active.id, tasks);
+    const to = containerOfDragId(over.id, tasks);
+    if (!from || !to || from === to) return;
+
+    const targetCategoryId = categoryIdFromContainer(to);
+    setTasks((current) =>
+      current.map((task) =>
+        task.id === Number(active.id) ? { ...task, category_id: targetCategoryId } : task,
+      ),
+    );
+  };
+
+  const handleDragEnd = async ({ active, over }: DragEndEvent) => {
+    const snapshot = dragSnapshot.current;
+    setActiveTask(null);
+    dragSnapshot.current = null;
+    if (!snapshot) return;
+
+    const taskId = Number(active.id);
+    const revert = (message: string) => {
+      setTasks(snapshot.tasks);
+      setReorderError(message);
+    };
+
+    // Dropped outside any column: put it back rather than guessing.
+    if (!over) {
+      setTasks(snapshot.tasks);
+      return;
+    }
+
+    const target = containerOfDragId(over.id, tasks);
+    if (!target) {
+      setTasks(snapshot.tasks);
+      return;
+    }
+    if (target === UNCATEGORIZED && snapshot.container !== UNCATEGORIZED) {
+      revert("Tasks cannot be moved into Uncategorized");
+      return;
+    }
+
+    // Order within the destination, which dragOver has already moved us into.
+    const inTarget = tasks.filter((t) => isPending(t) && containerOfTask(t) === target);
+    const ids = inTarget.map((t) => t.id);
+    const from = ids.indexOf(taskId);
+    const overIndex = ids.indexOf(Number(over.id));
+    const orderedIds = from === -1 ? ids : arrayMove(ids, from, overIndex === -1 ? ids.length - 1 : overIndex);
+
+    const belongsToTarget = (task: Task) => isPending(task) && containerOfTask(task) === target;
+    setTasks((current) => reorderWithinColumn(current, orderedIds, belongsToTarget));
+
+    const crossedCategory = snapshot.container !== target;
+    const targetCategoryId = categoryIdFromContainer(target);
+
+    try {
+      if (crossedCategory && targetCategoryId !== null) {
+        await moveTask(taskId, targetCategoryId, orderedIds);
+        // Points derive from the category unless pinned, so refetch to show the
+        // value the server now considers authoritative.
+        loadTasks();
+      } else if (orderedIds.length > 0) {
+        await reorderTasks(orderedIds);
+      }
+    } catch (e) {
+      console.error(e);
+      revert(e instanceof Error ? e.message : "Could not save the change");
+    }
+  };
+
+  // One column per category, so a category added in Admin gets a column instead
+  // of having its tasks silently absorbed by another one.
+  const allColumns = categories.map((category) => ({
+    key: containerIdFor(category.id),
+    title: category.name,
+    meta: `${category.default_points}p default`,
+    glyph: CATEGORY_GLYPHS[category.name] ?? FALLBACK_GLYPH,
+    belongs: (task: Task) => isPending(task) && task.category_id === category.id,
+  }));
+
+  // category_id is nullable, so a task pointing at nothing still has to appear
+  // somewhere rather than vanishing off the board.
+  const isOrphan = (task: Task) =>
+    isPending(task) && !categories.some((c) => c.id === task.category_id);
+  if (tasks.some(isOrphan)) {
+    allColumns.push({
+      key: UNCATEGORIZED,
+      title: "Uncategorized",
+      meta: "no category set",
+      glyph: FALLBACK_GLYPH,
+      belongs: isOrphan,
+    });
+  }
+
+  const columns =
+    view.kind === "category"
+      ? allColumns.filter((c) => c.key === containerIdFor(view.categoryId))
+      : allColumns;
+
+  const heading =
+    view.kind === "category" ? view.categoryName : view.kind === "history" ? "Task History" : "All Tasks";
+
+  const showBoard = view.kind !== "history";
+  const showHistory = view.kind !== "category";
+  const completed = tasks.filter(isCompleted);
+
+  return (
+    <div className="space-y-6">
+      <ContextHeader
+        title={heading}
+        meta={view.kind === "category" ? `${columns[0]?.meta ?? ""}` : undefined}
+      />
+
+      {reorderError && (
+        <div className="rounded border border-destructive/50 p-3 text-sm text-destructive">
+          {reorderError}. The list has been put back the way it was.
+        </div>
+      )}
+
+      {showBoard && (
+      // One context across every column, so a task can be dragged between them.
+      // closestCorners reads better than closestCenter for multi-column boards.
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onDragCancel={() => {
+          if (dragSnapshot.current) setTasks(dragSnapshot.current.tasks);
+          dragSnapshot.current = null;
+          setActiveTask(null);
+        }}
+      >
+        <div
+          className={cn(
+            "grid gap-4",
+            // A single category gets the full column instead of a third of it.
+            view.kind === "category" ? "grid-cols-1" : "md:grid-cols-2 xl:grid-cols-3",
           )}
-        </CardContent>
-      </Card>
+        >
+          {columns.map((column) => {
+            const Glyph = column.glyph.icon;
+            const columnTasks = tasks.filter(column.belongs);
+            return (
+              <Card key={column.key}>
+                <CardHeader className="flex flex-row items-center gap-2">
+                  <Glyph className={column.glyph.className} />
+                  <CardTitle>{column.title.trim()}</CardTitle>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {columnTasks.length} · {column.meta}
+                  </span>
+                </CardHeader>
+                <CardContent>
+                  <SortableTaskList
+                    containerId={column.key}
+                    tasks={columnTasks}
+                    getPoints={getTaskPoints}
+                    getAssignee={getUserName}
+                    onComplete={handleComplete}
+                    emptyMessage="Nothing here yet. Drag a task in."
+                  />
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Follows the cursor across column boundaries. */}
+        <DragOverlay>
+          {activeTask && (
+            <TaskRow
+              task={activeTask}
+              points={getTaskPoints(activeTask)}
+              assignee={getUserName(activeTask.user_id)}
+              onComplete={() => {}}
+              isOverlay
+            />
+          )}
+        </DragOverlay>
+      </DndContext>
+      )}
+
+      {showHistory && (
+        <TaskHistory
+          tasks={completed}
+          categories={categories}
+          users={users}
+          goals={goals}
+          milestones={milestones}
+          getPoints={getTaskPoints}
+          getAssignee={getUserName}
+        />
+      )}
     </div>
   );
 }

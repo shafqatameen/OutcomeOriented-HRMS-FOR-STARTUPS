@@ -32,8 +32,22 @@ class TaskCreate(TaskBase):
 class Task(TaskBase):
     id: int
     status: str
+    position: int
     class Config:
         from_attributes = True
+
+class TaskReorder(BaseModel):
+    """Full ordered id list for ONE column, from top to bottom."""
+    task_ids: List[int]
+
+class TaskMove(BaseModel):
+    """Moves a task into another category and reorders the destination column.
+
+    task_ids is the destination column's full order after the move, top to
+    bottom, and must contain the moved task.
+    """
+    category_id: int
+    task_ids: List[int]
 
 class PointLedgerBase(BaseModel):
     user_id: int

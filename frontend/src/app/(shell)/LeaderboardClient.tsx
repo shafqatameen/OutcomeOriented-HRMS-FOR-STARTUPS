@@ -4,6 +4,8 @@ import { getLeaderboard, getChartData, getCategories } from "@/lib/api";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import ContextHeader from "@/components/ContextHeader";
+import { RANGE_PRESETS, rangeLabel, resolveRange, type RangePreset } from "@/lib/date-range";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 const CustomDot = (props: any) => {
@@ -31,10 +33,21 @@ export default function LeaderboardClient() {
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
 
+  // The matrix carries its own range so it can be read over a different window
+  // than the chart above it.
+  const [matrixRange, setMatrixRange] = useState<RangePreset>("all");
+  const [matrixStart, setMatrixStart] = useState("");
+  const [matrixEnd, setMatrixEnd] = useState("");
+
   useEffect(() => {
-    getLeaderboard().then(setData).catch(console.error);
     getCategories().then(setCategories).catch(console.error);
   }, []);
+
+  useEffect(() => {
+    const range = resolveRange(matrixRange, matrixStart, matrixEnd);
+    if (!range) return; // custom range still incomplete
+    getLeaderboard(range.startDate, range.endDate).then(setData).catch(console.error);
+  }, [matrixRange, matrixStart, matrixEnd]);
 
   useEffect(() => {
     let startDate: string | undefined = undefined;
@@ -76,10 +89,14 @@ export default function LeaderboardClient() {
       .catch(console.error);
   }, [selectedCategory, timeFilter, customStart, customEnd]);
 
+  // Colour and shape are assigned from a stable identity, so re-ranking the
+  // matrix for a different range cannot recolour the chart's lines.
+  const chartSeries = [...data].sort((a, b) => a.user_id - b.user_id);
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12">
-      <h1 className="text-3xl font-bold">Leaderboard</h1>
-      
+    <div className="space-y-6 pb-12">
+      <ContextHeader title="Leaderboard" />
+
       <Card>
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
           <CardTitle>
@@ -138,7 +155,7 @@ export default function LeaderboardClient() {
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                {data.map((u, i) => {
+                {chartSeries.map((u, i) => {
                   const colors = ["#ef4444", "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6"];
                   const shapes = ["circle", "square", "triangle", "diamond", "star"];
                   return (
@@ -161,8 +178,39 @@ export default function LeaderboardClient() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Point Matrix</CardTitle>
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
+          <CardTitle>Point Matrix ({rangeLabel(matrixRange)})</CardTitle>
+          <div className="flex flex-wrap gap-2 items-center">
+            {matrixRange === "custom" && (
+              <div className="flex gap-2 items-center">
+                <input
+                  type="date"
+                  aria-label="Matrix range start"
+                  className="border rounded p-2 text-sm bg-white dark:bg-slate-900"
+                  value={matrixStart}
+                  onChange={(e) => setMatrixStart(e.target.value)}
+                />
+                <span className="text-sm text-slate-500">to</span>
+                <input
+                  type="date"
+                  aria-label="Matrix range end"
+                  className="border rounded p-2 text-sm bg-white dark:bg-slate-900"
+                  value={matrixEnd}
+                  onChange={(e) => setMatrixEnd(e.target.value)}
+                />
+              </div>
+            )}
+            <select
+              aria-label="Point matrix time range"
+              className="border rounded p-2 text-sm bg-white dark:bg-slate-900"
+              value={matrixRange}
+              onChange={(e) => setMatrixRange(e.target.value as RangePreset)}
+            >
+              {RANGE_PRESETS.map((preset) => (
+                <option key={preset.value} value={preset.value}>{preset.label}</option>
+              ))}
+            </select>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -171,8 +219,11 @@ export default function LeaderboardClient() {
               <TableRow>
                 <TableHead>Rank</TableHead>
                 <TableHead>User</TableHead>
-                <TableHead>Core</TableHead>
-                <TableHead>Adjacent</TableHead>
+                {/* One column per category, so a column labelled with a category
+                    name holds that category's points. */}
+                {categories.map(c => (
+                  <TableHead key={c.id}>{c.name.trim()}</TableHead>
+                ))}
                 <TableHead>Total Points</TableHead>
               </TableRow>
             </TableHeader>
@@ -186,9 +237,17 @@ export default function LeaderboardClient() {
                     {idx > 2 && idx + 1}
                   </TableCell>
                   <TableCell className="font-medium">{user.name.toUpperCase()}</TableCell>
-                  <TableCell>{user.core_points}</TableCell>
-                  <TableCell>{user.adjacent_points}</TableCell>
-                  <TableCell className="text-lg font-bold">{user.total_points}</TableCell>
+                  {categories.map(c => (
+                    <TableCell key={c.id}>{user.category_points?.[String(c.id)] ?? 0}</TableCell>
+                  ))}
+                  <TableCell className="text-lg font-bold">
+                    {user.total_points}
+                    {matrixRange !== "all" && (
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        of {user.all_time_points} all time
+                      </span>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
