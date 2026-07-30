@@ -35,6 +35,10 @@ PERMISSIONS: List[Permission] = [
                "Create categories and change their default points."),
     Permission("admin.users", "Manage accounts and access", "Administration",
                "Create accounts and grant or revoke feature access."),
+    Permission("data.export", "Export data", "Data",
+               "Download your own tasks, activity and points as CSV or Excel."),
+    Permission("data.export.all", "Export everyone's data", "Data",
+               "Widen exports to include every account's tasks, activity and points."),
 ]
 
 PERMISSION_KEYS = {permission.key for permission in PERMISSIONS}

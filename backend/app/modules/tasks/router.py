@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.core.database import get_db
 from app.modules.tasks import models, schemas
+from app.modules.tasks.points import effective_points, points_are_pinned
 from app.modules.auth.dependencies import require_permission, require_user
 
 router = APIRouter(tags=["Tasks"])
@@ -123,8 +124,8 @@ def move_task(
         "message": "Task moved",
         "task_id": task.id,
         "category_id": task.category_id,
-        "points_are_pinned": task.points is not None,
-        "effective_points": task.points if task.points is not None else category.default_points,
+        "points_are_pinned": points_are_pinned(task),
+        "effective_points": effective_points(task, category),
     }
 
 @router.post("/tasks/{task_id}/complete")
@@ -138,10 +139,9 @@ def complete_task(task_id: int, db: Session = Depends(get_db), current_user=Depe
         raise HTTPException(status_code=403, detail="You can only complete your own tasks")
 
     db_task.status = "Completed"
-    
-    # Points precedence: explicitly set on task > category default
-    points = db_task.points if db_task.points is not None else db_task.category.default_points
-    
+
+    points = effective_points(db_task)
+
     db_task.user.total_points += points
 
     ledger = models.PointLedger(
