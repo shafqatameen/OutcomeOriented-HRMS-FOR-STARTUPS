@@ -109,7 +109,14 @@ export default function ExportClient() {
         .reduce((sum, s) => sum + s.row_estimate, 0)
     : 0;
 
-  const extension = format === "xlsx" ? "xlsx" : selected.length === 1 ? "csv" : "zip";
+  // No selection means no file yet, so naming an extension would be a guess.
+  const extension = !selected.length
+    ? null
+    : format === "xlsx"
+      ? "xlsx"
+      : selected.length === 1
+        ? "csv"
+        : "zip";
 
   return (
     <div className="space-y-6 pb-12">
@@ -129,7 +136,7 @@ export default function ExportClient() {
             ) : (
               <Download className="mr-2 h-4 w-4" />
             )}
-            {busy ? "Preparing..." : `Download .${extension}`}
+            {busy ? "Preparing..." : extension ? `Download .${extension}` : "Download"}
           </Button>
         }
       />
