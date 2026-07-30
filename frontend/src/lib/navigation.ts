@@ -11,10 +11,16 @@ import {
   ListChecks,
   Layers,
   ShieldCheck,
+  Download,
   type LucideIcon,
 } from "lucide-react";
 
-export type DestinationId = "leaderboard" | "tasks" | "goals" | "administration";
+export type DestinationId =
+  | "leaderboard"
+  | "tasks"
+  | "goals"
+  | "export"
+  | "administration";
 
 export type SubDestination = {
   id: string;
@@ -90,6 +96,13 @@ export function buildDestinations({ categories, goals }: NavigationData): Destin
           glyph: Flag,
         })),
       ],
+    },
+    {
+      id: "export",
+      label: "Export",
+      route: "/export",
+      glyph: Download,
+      permission: "data.export",
     },
     {
       id: "administration",
