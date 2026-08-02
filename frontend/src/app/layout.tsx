@@ -24,7 +24,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>{children}</body>
+      {/* Browser extensions inject attributes onto body before hydration
+          (ColorZilla's cz-shortcut-listen, Grammarly's data-gr-*), which React
+          reports as a mismatch. Suppression covers only this element's own
+          attributes, not the tree below it. */}
+      <body className={inter.className} suppressHydrationWarning>{children}</body>
     </html>
   );
 }
