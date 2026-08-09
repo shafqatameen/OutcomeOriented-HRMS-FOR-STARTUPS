@@ -57,6 +57,8 @@ systemctl restart hrms-frontend
 sleep 3
 failed=0
 for unit in hrms-backend hrms-frontend caddy; do
+  # caddy is absent on aaPanel installs (deploy/install-aapanel.sh) — skip it.
+  [[ "$unit" == "caddy" ]] && ! systemctl list-unit-files --no-legend "caddy.service" 2>/dev/null | grep -q . && continue
   if systemctl is-active --quiet "$unit"; then
     echo "    ok   $unit"
   else

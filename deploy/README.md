@@ -82,6 +82,47 @@ off the box on a schedule:
 sqlite3 /opt/hrms/backend/pointsystem.db ".backup '/var/backups/hrms-$(date +\%F).db'"
 ```
 
+## Deploying with aaPanel instead of Caddy
+
+If the VPS already runs aaPanel, its own Nginx (or OpenLiteSpeed) owns ports
+80/443 — Caddy can't bind them too. Use `install-aapanel.sh` instead of
+`install.sh`; it does everything the same script does *except* install Caddy
+or touch the firewall. aaPanel's Nginx and SSL tab take over that half.
+
+```bash
+ssh root@your-vps-ip
+git clone https://github.com/shafqatameen/OutcomeOriented-HRMS-FOR-STARTUPS.git /opt/hrms
+cd /opt/hrms
+chmod +x deploy/*.sh
+
+DOMAIN=hrms.company.internal ./deploy/install-aapanel.sh
+```
+
+This installs Node, uv, and the `hrms` service user; builds both apps; writes
+`hrms-backend`/`hrms-frontend` systemd units bound to `127.0.0.1:8000` and
+`127.0.0.1:3000`; seeds the database if empty; and starts both services. It
+stops there — the backend and frontend are only reachable from inside the box
+until you wire up aaPanel:
+
+1. **Website → Add site** for `hrms.company.internal`. PHP version: pure
+   static / none — this site only reverse-proxies, it doesn't serve files
+   from the document root.
+2. **Website → your site → Config File**: replace the default `location /`
+   block with the contents of
+   [deploy/aapanel-nginx.conf.snippet](aapanel-nginx.conf.snippet). This
+   strips `/api/*` and forwards it to FastAPI, and sends everything else to
+   Next.js — matching what the Caddyfile does in the non-aaPanel setup.
+3. **Website → your site → SSL**: issue a free Let's Encrypt cert for the
+   domain. This needs `hrms.company.internal` to resolve to the VPS and port
+   80 to be reachable for the HTTP-01 challenge. If the domain is only
+   resolvable on an internal/company DNS server that isn't reachable from the
+   public internet, Let's Encrypt's HTTP-01 validation will fail — use
+   aaPanel's DNS-01 option (if your DNS provider is supported) or import a
+   cert from an internal CA instead.
+
+`update.sh` works unmodified for aaPanel installs — it skips the Caddy
+restart/check automatically when no `caddy.service` unit is present.
+
 ## Notes and limits
 
 - **SQLite.** Fine for a small team, and the whole database is one file to back
