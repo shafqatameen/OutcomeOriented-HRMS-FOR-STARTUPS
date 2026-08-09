@@ -1,0 +1,34 @@
+{
+	email @ADMIN_EMAIL@
+}
+
+@DOMAIN@ {
+	encode zstd gzip
+
+	# Browser API calls. handle_path strips the /api prefix, so /api/auth/login
+	# reaches FastAPI as /auth/login. Serving both halves from one origin is what
+	# keeps the session cookie first-party and takes CORS out of the picture.
+	handle_path /api/* {
+		reverse_proxy 127.0.0.1:@BACKEND_PORT@
+	}
+
+	# Everything else is the Next.js app.
+	handle {
+		reverse_proxy 127.0.0.1:@FRONTEND_PORT@
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output file /var/log/caddy/hrms.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}

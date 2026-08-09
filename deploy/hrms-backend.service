@@ -1,0 +1,26 @@
+[Unit]
+Description=HRMS FastAPI backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=@APP_USER@
+Group=@APP_USER@
+# SQLALCHEMY_DATABASE_URL is the relative sqlite:///./pointsystem.db, so the
+# working directory decides where the database file lives.
+WorkingDirectory=@APP_DIR@/backend
+EnvironmentFile=@ENV_DIR@/backend.env
+ExecStart=@APP_DIR@/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port @BACKEND_PORT@
+Restart=always
+RestartSec=3
+
+# Bound to loopback only; Caddy is the sole public entry point.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=@APP_DIR@/backend
+
+[Install]
+WantedBy=multi-user.target
