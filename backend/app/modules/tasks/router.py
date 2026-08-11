@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional, Tuple
 from app.core.database import get_db
+from app.core.integrity import Blocker, deletion_blocked
 from app.modules.tasks import models, schemas
 from app.modules.tasks.points import effective_points, points_are_pinned
 from app.modules.auth.dependencies import require_permission, require_user
@@ -33,6 +34,102 @@ def update_category(category_id: int, update: schemas.CategoryUpdate, db: Sessio
     db.commit()
     db.refresh(db_cat)
     return db_cat
+
+def _category_usage(db: Session, category_id: int) -> Tuple[int, int]:
+    """(total, completed) tasks pointing at this category."""
+    total = 0
+    completed = 0
+    for status, count in (
+        db.query(models.Task.status, func.count(models.Task.id))
+        .filter(models.Task.category_id == category_id)
+        .group_by(models.Task.status)
+        .all()
+    ):
+        total += count
+        if status == "Completed":
+            completed += count
+    return total, completed
+
+@router.get("/categories/{category_id}/usage", response_model=schemas.CategoryUsage)
+def read_category_usage(category_id: int, db: Session = Depends(get_db), _admin=Depends(require_permission("admin.categories"))):
+    """What deleting this category would have to deal with.
+
+    Exists so the confirmation dialog can state the consequence before asking,
+    rather than the user discovering it from a rejected delete. Counts are read
+    here instead of client-side because /tasks needs `tasks.view`, which an
+    account granted only `admin.categories` does not have.
+    """
+    category = db.query(models.Category).filter(models.Category.id == category_id).first()
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    total, completed = _category_usage(db, category_id)
+    return {
+        "category_id": category.id,
+        "name": category.name,
+        "task_count": total,
+        "completed_task_count": completed,
+        "pending_task_count": total - completed,
+    }
+
+@router.delete("/categories/{category_id}")
+def delete_category(
+    category_id: int,
+    reassign_to: Optional[int] = Query(
+        None,
+        description="Move every task in this category here first. Required while the category is still in use.",
+    ),
+    db: Session = Depends(get_db),
+    _admin=Depends(require_permission("admin.categories")),
+):
+    """Deletes a category, moving its tasks elsewhere first when asked to.
+
+    Refuses with 409 while tasks still point at it. Clearing `category_id`
+    instead would be worse than it looks: `effective_points` falls back to 0
+    without a category, and the board's Uncategorized column refuses drops, so
+    those tasks would be stranded there at zero with no way back.
+
+    Reassignment carries the same points caveat as PATCH /tasks/{id}/move - a
+    task with no pinned value inherits the destination's default. For completed
+    tasks it also shifts their ledger points into the destination's column on the
+    leaderboard, because the ledger derives its category through the task rather
+    than storing one.
+    """
+    category = db.query(models.Category).filter(models.Category.id == category_id).first()
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    tasks = db.query(models.Task).filter(models.Task.category_id == category_id).all()
+
+    if tasks and reassign_to is None:
+        completed = sum(1 for task in tasks if task.status == "Completed")
+        raise deletion_blocked(
+            entity="category",
+            name=category.name,
+            blockers=[
+                Blocker("tasks", len(tasks), f"{completed} completed, {len(tasks) - completed} pending")
+            ],
+            remedy="Pick another category to move them to, then delete.",
+        )
+
+    if reassign_to is not None:
+        if reassign_to == category_id:
+            raise HTTPException(status_code=400, detail="reassign_to must be a different category")
+        target = db.query(models.Category).filter(models.Category.id == reassign_to).first()
+        if not target:
+            raise HTTPException(status_code=404, detail="Destination category not found")
+        for task in tasks:
+            task.category_id = reassign_to
+
+    db.delete(category)
+    db.commit()
+
+    return {
+        "message": "Category deleted",
+        "category_id": category_id,
+        "reassigned_tasks": len(tasks) if reassign_to is not None else 0,
+        "reassigned_to": reassign_to,
+    }
 
 @router.get("/tasks", response_model=List[schemas.Task])
 def read_tasks(db: Session = Depends(get_db), _user=Depends(require_permission("tasks.view"))):

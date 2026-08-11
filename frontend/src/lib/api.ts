@@ -1,5 +1,64 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+/**
+ * A failed request, carrying the API's `detail` intact.
+ *
+ * `detail` is a plain string for most failures but an object for the ones a UI
+ * has to react to rather than merely print — a blocked delete, say. `message`
+ * stays a readable sentence either way, so every existing `e.message` call site
+ * keeps working.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly detail: unknown;
+
+  constructor(message: string, status: number, detail: unknown) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
+/** Unwraps a non-2xx response into an ApiError. Never returns. */
+const raiseForStatus = async (response: Response): Promise<never> => {
+  let detail: unknown = null;
+  try {
+    detail = (await response.json())?.detail ?? null;
+  } catch {}
+
+  const message =
+    typeof detail === "string"
+      ? detail
+      : typeof (detail as { message?: unknown } | null)?.message === "string"
+        ? ((detail as { message: string }).message)
+        : response.statusText;
+
+  throw new ApiError(message, response.status, detail);
+};
+
+/** One reason a delete was refused, e.g. 7 tasks still using a category. */
+export type DeletionBlocker = { kind: string; count: number; detail: string };
+
+/** The 409 body the API sends when a delete would orphan rows. */
+export type DeletionBlocked = {
+  code: "deletion_blocked";
+  entity: string;
+  name: string;
+  message: string;
+  remedy: string;
+  blockers: DeletionBlocker[];
+};
+
+/** The blocked-delete payload if that is what this error is, otherwise null. */
+export const asDeletionBlocked = (error: unknown): DeletionBlocked | null => {
+  if (!(error instanceof ApiError) || typeof error.detail !== "object" || error.detail === null) {
+    return null;
+  }
+  const detail = error.detail as DeletionBlocked;
+  return detail.code === "deletion_blocked" ? detail : null;
+};
+
 export const fetchAPI = async (endpoint: string, options: RequestInit = {}) => {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
@@ -10,15 +69,10 @@ export const fetchAPI = async (endpoint: string, options: RequestInit = {}) => {
     },
   });
 
-  if (!response.ok) {
-    let detail = response.statusText;
-    try {
-      const body = await response.json();
-      if (body?.detail) detail = body.detail;
-    } catch {}
-    throw new Error(detail);
-  }
+  if (!response.ok) await raiseForStatus(response);
 
+  // 204 and other empty bodies would make response.json() throw.
+  if (response.status === 204) return null;
   return response.json();
 };
 
@@ -37,14 +91,7 @@ export const fetchBlob = async (
 ): Promise<DownloadedFile> => {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, { credentials: "include" });
 
-  if (!response.ok) {
-    let detail = response.statusText;
-    try {
-      const body = await response.json();
-      if (body?.detail) detail = body.detail;
-    } catch {}
-    throw new Error(detail);
-  }
+  if (!response.ok) await raiseForStatus(response);
 
   return {
     blob: await response.blob(),
@@ -96,6 +143,17 @@ export const createTask = (data: any) => fetchAPI("/tasks", { method: "POST", bo
 export const createCategory = (data: any) => fetchAPI("/categories", { method: "POST", body: JSON.stringify(data) });
 export const updateCategory = (categoryId: number, data: any) =>
   fetchAPI(`/categories/${categoryId}`, { method: "PATCH", body: JSON.stringify(data) });
+/** How many tasks a delete would have to move. Asked before confirming, not after. */
+export const getCategoryUsage = (categoryId: number) =>
+  fetchAPI(`/categories/${categoryId}/usage`);
+/**
+ * Omit `reassignTo` only for a category nothing uses — the API refuses with a
+ * 409 (see `asDeletionBlocked`) while any task still points at it.
+ */
+export const deleteCategory = (categoryId: number, reassignTo?: number) => {
+  const query = reassignTo === undefined ? "" : `?reassign_to=${reassignTo}`;
+  return fetchAPI(`/categories/${categoryId}${query}`, { method: "DELETE" });
+};
 export const login = (name: string, password: string) =>
   fetchAPI("/auth/login", { method: "POST", body: JSON.stringify({ name, password }) });
 export const logout = () => fetchAPI("/auth/logout", { method: "POST" });

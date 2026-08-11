@@ -18,6 +18,14 @@ class Category(CategoryBase):
     class Config:
         from_attributes = True
 
+class CategoryUsage(BaseModel):
+    """What a category delete would have to deal with, asked before confirming."""
+    category_id: int
+    name: str
+    task_count: int
+    completed_task_count: int
+    pending_task_count: int
+
 class TaskBase(BaseModel):
     title: str
     user_id: int
