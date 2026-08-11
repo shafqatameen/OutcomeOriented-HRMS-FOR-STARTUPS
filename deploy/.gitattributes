@@ -1,0 +1,5 @@
+# Authored on Windows, executed by bash on the VPS. A CRLF line ending would
+# make the shebang `#!/usr/bin/env bash\r` and the script would not run.
+*.sh text eol=lf
+Caddyfile text eol=lf
+*.service text eol=lf

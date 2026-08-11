@@ -1,3 +1,4 @@
+import os
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
@@ -9,6 +10,10 @@ from app.modules.auth.dependencies import get_current_user, granted_keys, COOKIE
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 COOKIE_MAX_AGE = 60 * 60 * 24 * 7  # seconds, 7 days
+
+# Off by default so local development over http://localhost keeps working; the
+# deploy sets COOKIE_SECURE=true so the session cookie is never sent in clear.
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"
 
 
 @router.get("/login-options", response_model=List[schemas.LoginOption])
@@ -34,7 +39,7 @@ def login(payload: schemas.LoginRequest, response: Response, db: Session = Depen
         key=COOKIE_NAME,
         value=token,
         httponly=True,
-        secure=False,
+        secure=COOKIE_SECURE,
         samesite="lax",
         max_age=COOKIE_MAX_AGE,
         path="/",

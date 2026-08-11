@@ -1,0 +1,26 @@
+[Unit]
+Description=HRMS Next.js frontend
+After=network-online.target hrms-backend.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=@APP_USER@
+Group=@APP_USER@
+WorkingDirectory=@APP_DIR@/frontend
+Environment=NODE_ENV=production
+Environment=PORT=@FRONTEND_PORT@
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=3
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=read-only
+# Next writes its runtime cache under .next/cache while serving.
+ReadWritePaths=@APP_DIR@/frontend/.next
+
+[Install]
+WantedBy=multi-user.target
