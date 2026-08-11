@@ -163,6 +163,23 @@ export const getUserAccess = () => fetchAPI("/users/access");
 /** Replaces one account's grants with exactly this set. */
 export const setUserAccess = (userId: number, permissions: string[]) =>
   fetchAPI(`/users/${userId}/access`, { method: "PUT", body: JSON.stringify({ permissions }) });
+/** New accounts start on the default grant set; widen it from the Access page. */
+export const createUser = (data: { name: string; role: string; password: string }) =>
+  fetchAPI("/users", { method: "POST", body: JSON.stringify(data) });
+/**
+ * Blocks or restores sign-in. Deactivating takes effect on that person's next
+ * request, not just their next login, and leaves their tasks and points alone.
+ */
+export const setUserActive = (userId: number, isActive: boolean) =>
+  fetchAPI(`/users/${userId}/active`, {
+    method: "PATCH",
+    body: JSON.stringify({ is_active: isActive }),
+  });
+/**
+ * Only ever succeeds for an account with no tasks and no points — anything else
+ * is refused with a 409 (see `asDeletionBlocked`) naming what still points at it.
+ */
+export const deleteUser = (userId: number) => fetchAPI(`/users/${userId}`, { method: "DELETE" });
 export const getLoginOptions = () => fetchAPI("/auth/login-options");
 export const getGoals = () => fetchAPI("/goals");
 export const createGoal = (data: any) => fetchAPI("/goals", { method: "POST", body: JSON.stringify(data) });

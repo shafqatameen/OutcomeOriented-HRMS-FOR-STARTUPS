@@ -7,6 +7,7 @@ const ADMIN_SURFACES: { route: string; permission: string }[] = [
   { route: "/admin/tasks", permission: "admin.tasks" },
   { route: "/admin/goals", permission: "admin.goals" },
   { route: "/admin/categories", permission: "admin.categories" },
+  { route: "/admin/people", permission: "admin.users" },
   { route: "/admin/access", permission: "admin.users" },
 ];
 

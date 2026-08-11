@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from app.core.database import get_db
+from app.core.integrity import Blocker, deletion_blocked
 from app.modules.users import models, schemas
+from app.modules.tasks import models as task_models
 from app.modules.auth.dependencies import granted_keys, require_permission, require_user
 from app.modules.auth.permissions import (
     DEFAULT_NEW_USER_PERMISSIONS,
@@ -38,6 +40,117 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db), _admin=
     db.commit()
     db.refresh(db_user)
     return db_user
+
+
+def _guard_not_self(actor, target, verb: str) -> None:
+    """Stops an administrator locking themselves out with their own button."""
+    if actor.id == target.id:
+        raise HTTPException(status_code=400, detail=f"You cannot {verb} your own account.")
+
+
+def _guard_not_last_admin(db: Session, target, verb: str) -> None:
+    """Keeps at least one active Admin in existence.
+
+    Not covered by the self guard: `admin.users` can be granted to a Member, and
+    that Member could otherwise deactivate the only administrator. Nobody would
+    then hold the role that bypasses permission checks, so any feature nobody
+    has been granted becomes unreachable for everyone.
+    """
+    if target.role != "Admin":
+        return
+
+    others = (
+        db.query(models.User)
+        .filter(
+            models.User.role == "Admin",
+            models.User.is_active.is_(True),
+            models.User.id != target.id,
+        )
+        .count()
+    )
+    if others == 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"You cannot {verb} the last active administrator.",
+        )
+
+
+@router.patch("/{user_id}/active", response_model=schemas.User)
+def set_user_active(
+    user_id: int,
+    update: schemas.UserActiveUpdate,
+    db: Session = Depends(get_db),
+    actor=Depends(require_permission("admin.users")),
+):
+    """Blocks or restores sign-in for one account.
+
+    Deactivation is deliberately narrow: it stops the account logging in and
+    drops it from the login picker, and does nothing else. Tasks, ledger rows
+    and leaderboard position all stay exactly as they were, which is what makes
+    restoring it a single flip back rather than a recovery job.
+    """
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not update.is_active:
+        _guard_not_self(actor, user, "deactivate")
+        _guard_not_last_admin(db, user, "deactivate")
+
+    user.is_active = update.is_active
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.delete("/{user_id}")
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    actor=Depends(require_permission("admin.users")),
+):
+    """Deletes an account, refusing while any of its history still exists.
+
+    SQLite is running without `PRAGMA foreign_keys` (see core.database), so a
+    DELETE here would not fail on the child rows - it would quietly orphan the
+    account's tasks and ledger entries, and the leaderboard is computed from
+    that ledger. An account with any history is therefore refused with the same
+    structured 409 the category delete uses, naming the blast radius and
+    pointing at deactivation, which preserves all of it.
+
+    Only genuinely empty accounts are removed. Their permission grants go with
+    them through the delete-orphan cascade on User.permissions.
+    """
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    _guard_not_self(actor, user, "delete")
+    _guard_not_last_admin(db, user, "delete")
+
+    task_count = db.query(task_models.Task).filter(task_models.Task.user_id == user_id).count()
+    ledger_count = (
+        db.query(task_models.PointLedger).filter(task_models.PointLedger.user_id == user_id).count()
+    )
+
+    blockers = []
+    if task_count:
+        blockers.append(Blocker("tasks", task_count))
+    if ledger_count:
+        blockers.append(Blocker("point ledger entries", ledger_count, f"{user.total_points} points earned"))
+
+    if blockers:
+        raise deletion_blocked(
+            entity="user",
+            name=user.name,
+            blockers=blockers,
+            remedy="Deactivate this account instead - it blocks sign-in and keeps the history intact.",
+        )
+
+    db.delete(user)
+    db.commit()
+
+    return {"message": "User deleted", "user_id": user_id}
 
 
 @router.get("/access/catalogue", response_model=List[schemas.PermissionInfo])

@@ -11,9 +11,17 @@ class UserCreate(UserBase):
 class User(UserBase):
     id: int
     total_points: int
+    #: False means sign-in is blocked. Everything else about the account -
+    #: its tasks, its points, its place on the leaderboard - is unaffected.
+    is_active: bool
 
     class Config:
         from_attributes = True
+
+
+class UserActiveUpdate(BaseModel):
+    """Deactivates the account when false, restores it when true."""
+    is_active: bool
 
 
 class PermissionInfo(BaseModel):
