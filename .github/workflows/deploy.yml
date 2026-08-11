@@ -1,0 +1,24 @@
+name: Deploy to server
+
+on:
+  push:
+    branches:
+      - main
+
+# Avoid two deploys racing if pushes land in quick succession.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH and run update.sh
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
+          command_timeout: 15m
+          script: /opt/hrms/deploy/update.sh
