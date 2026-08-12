@@ -15,7 +15,53 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { PlusCircle, Trash2, UserMinus, UserCheck, Pencil, Check, X } from "lucide-react";
+import { PlusCircle, Trash2, UserMinus, UserCheck, Pencil, Check, X, Eye, EyeOff } from "lucide-react";
+
+/**
+ * A password box with a reveal toggle.
+ *
+ * Only ever shows what is being typed right now. The stored password is a hash,
+ * so there is no existing one to reveal — an empty box with the eye held open
+ * still shows nothing, which is correct rather than broken.
+ */
+function PasswordInput({
+  value,
+  onChange,
+  placeholder,
+  required,
+  className,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  required?: boolean;
+  className?: string;
+}) {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <div className={`relative ${className ?? ""}`}>
+      <Input
+        type={visible ? "text" : "password"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        required={required}
+        className="pr-10"
+      />
+      <button
+        // Inside the Add Person <form>, so it must not default to submitting it.
+        type="button"
+        onClick={() => setVisible((current) => !current)}
+        aria-label={visible ? "Hide password" : "Show password"}
+        title={visible ? "Hide password" : "Show password"}
+        className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+      >
+        {visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+      </button>
+    </div>
+  );
+}
 
 type Person = {
   id: number;
@@ -190,12 +236,7 @@ export default function PeopleAdminForm({ currentUserId }: { currentUserId: numb
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Password</label>
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
+                <PasswordInput value={password} onChange={setPassword} required />
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -234,11 +275,10 @@ export default function PeopleAdminForm({ currentUserId }: { currentUserId: numb
                           className="max-w-xs"
                           placeholder="Name"
                         />
-                        <Input
-                          type="password"
+                        <PasswordInput
                           value={editPassword}
-                          onChange={(e) => setEditPassword(e.target.value)}
-                          className="max-w-xs"
+                          onChange={setEditPassword}
+                          className="w-full max-w-xs"
                           placeholder="Leave blank to keep password"
                         />
                       </div>
