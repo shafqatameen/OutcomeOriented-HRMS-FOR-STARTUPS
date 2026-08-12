@@ -189,9 +189,33 @@ export const deleteUser = (userId: number) => fetchAPI(`/users/${userId}`, { met
 export const getLoginOptions = () => fetchAPI("/auth/login-options");
 export const getGoals = () => fetchAPI("/goals");
 export const createGoal = (data: any) => fetchAPI("/goals", { method: "POST", body: JSON.stringify(data) });
+export const updateGoal = (goalId: number, data: { title: string }) =>
+  fetchAPI(`/goals/${goalId}`, { method: "PATCH", body: JSON.stringify(data) });
+/** How many milestones and tasks a delete would take with it. Asked before confirming. */
+export const getGoalUsage = (goalId: number) => fetchAPI(`/goals/${goalId}/usage`);
+/**
+ * Omit `cascade` only for a goal with no milestones — the API refuses with a 409
+ * (see `asDeletionBlocked`) while any still belong to it. Cascading deletes the
+ * milestones but never the tasks: those are unlinked and keep their points.
+ */
+export const deleteGoal = (goalId: number, cascade = false) =>
+  fetchAPI(`/goals/${goalId}${cascade ? "?cascade=true" : ""}`, { method: "DELETE" });
 export const getMilestones = () => fetchAPI("/milestones");
 export const createMilestone = (data: any) => fetchAPI("/milestones", { method: "POST", body: JSON.stringify(data) });
 export const completeMilestone = (milestoneId: number) => fetchAPI(`/milestones/${milestoneId}`, { method: "PATCH", body: JSON.stringify({ status: "Completed" }) });
+/** Renames a milestone. Allowed even once it is completed. */
+export const updateMilestone = (milestoneId: number, data: { title: string }) =>
+  fetchAPI(`/milestones/${milestoneId}`, { method: "PATCH", body: JSON.stringify(data) });
+/** How many tasks a delete would unlink. Asked before confirming. */
+export const getMilestoneUsage = (milestoneId: number) =>
+  fetchAPI(`/milestones/${milestoneId}/usage`);
+/**
+ * Omit `cascade` only for a milestone with no tasks — the API refuses with a 409
+ * (see `asDeletionBlocked`) while any point at it. Cascading unlinks those tasks
+ * rather than deleting them.
+ */
+export const deleteMilestone = (milestoneId: number, cascade = false) =>
+  fetchAPI(`/milestones/${milestoneId}${cascade ? "?cascade=true" : ""}`, { method: "DELETE" });
 /** Which sheets this account may download, and roughly how big each one is. */
 export const getExportManifest = (startDate?: string, endDate?: string) => {
   const params = new URLSearchParams();
