@@ -75,6 +75,54 @@ def _guard_not_last_admin(db: Session, target, verb: str) -> None:
         )
 
 
+@router.patch("/{user_id}", response_model=schemas.User)
+def update_user(
+    user_id: int,
+    update: schemas.UserUpdate,
+    db: Session = Depends(get_db),
+    _admin=Depends(require_permission("admin.users")),
+):
+    """Renames an account and/or sets a new password.
+
+    Names are how people sign in and are unique, so a clash is refused rather
+    than silently allowed - two accounts answering to the same name would make
+    the login picker ambiguous.
+
+    Changing the password does not end sessions that are already open: the token
+    carries no password version to compare against. Deactivate then restore the
+    account if an existing session needs to be cut off as well.
+    """
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if update.name is not None:
+        name = update.name.strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Name cannot be empty")
+
+        taken = (
+            db.query(models.User)
+            .filter(models.User.name == name, models.User.id != user_id)
+            .first()
+        )
+        if taken:
+            raise HTTPException(status_code=400, detail="A user with that name already exists")
+        user.name = name
+
+    if update.password is not None:
+        # An empty string here is a mistake rather than an intent: it would
+        # otherwise hash to a real, guessable password. Callers that mean "leave
+        # it alone" omit the field entirely.
+        if not update.password.strip():
+            raise HTTPException(status_code=400, detail="Password cannot be empty")
+        user.password_hash = hash_password(update.password)
+
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 @router.patch("/{user_id}/active", response_model=schemas.User)
 def set_user_active(
     user_id: int,

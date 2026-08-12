@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import {
   getUsers,
   createUser,
+  updateUser,
   setUserActive,
   deleteUser,
   asDeletionBlocked,
@@ -14,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { PlusCircle, Trash2, UserMinus, UserCheck } from "lucide-react";
+import { PlusCircle, Trash2, UserMinus, UserCheck, Pencil, Check, X } from "lucide-react";
 
 type Person = {
   id: number;
@@ -31,6 +32,10 @@ export default function PeopleAdminForm({ currentUserId }: { currentUserId: numb
   const [role, setRole] = useState("Member");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPassword, setEditPassword] = useState("");
 
   const [pendingDelete, setPendingDelete] = useState<Person | null>(null);
   const [blocked, setBlocked] = useState<DeletionBlocked | null>(null);
@@ -66,6 +71,42 @@ export default function PeopleAdminForm({ currentUserId }: { currentUserId: numb
       setPassword("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create person");
+    }
+  };
+
+  const startEdit = (person: Person) => {
+    setEditingId(person.id);
+    setEditName(person.name);
+    // Never prefilled: the stored password is a hash, so there is nothing
+    // truthful to show, and a blank box reads correctly as "unchanged".
+    setEditPassword("");
+    setError(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditPassword("");
+  };
+
+  const handleSaveEdit = async (userId: number) => {
+    setError(null);
+    const payload: { name?: string; password?: string } = {};
+    if (editName.trim()) payload.name = editName.trim();
+    // Left blank means keep the current password. The API rejects an empty
+    // string rather than hashing it, so it has to be omitted, not sent through.
+    if (editPassword) payload.password = editPassword;
+
+    if (!payload.name && !payload.password) {
+      cancelEdit();
+      return;
+    }
+
+    try {
+      await updateUser(userId, payload);
+      cancelEdit();
+      reloadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update person");
     }
   };
 
@@ -184,6 +225,34 @@ export default function PeopleAdminForm({ currentUserId }: { currentUserId: numb
                   key={person.id}
                   className="flex justify-between items-center p-3 border rounded gap-4"
                 >
+                  {editingId === person.id ? (
+                    <>
+                      <div className="flex flex-1 gap-2 min-w-0">
+                        <Input
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="max-w-xs"
+                          placeholder="Name"
+                        />
+                        <Input
+                          type="password"
+                          value={editPassword}
+                          onChange={(e) => setEditPassword(e.target.value)}
+                          className="max-w-xs"
+                          placeholder="Leave blank to keep password"
+                        />
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <Button type="button" size="sm" onClick={() => handleSaveEdit(person.id)}>
+                          <Check className="w-4 h-4" />
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" onClick={cancelEdit}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                  <>
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="font-medium truncate">{person.name}</span>
                     <Badge variant="outline" className="text-muted-foreground">
@@ -201,6 +270,16 @@ export default function PeopleAdminForm({ currentUserId }: { currentUserId: numb
                   </div>
 
                   <div className="flex gap-2 shrink-0">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => startEdit(person)}
+                      className="flex gap-2"
+                    >
+                      <Pencil className="w-4 h-4" />
+                      Edit
+                    </Button>
                     {person.is_active ? (
                       <Button
                         type="button"
@@ -242,6 +321,8 @@ export default function PeopleAdminForm({ currentUserId }: { currentUserId: numb
                       Delete
                     </Button>
                   </div>
+                  </>
+                  )}
                 </div>
               );
             })

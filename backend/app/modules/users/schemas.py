@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 class UserBase(BaseModel):
     name: str
@@ -22,6 +22,17 @@ class User(UserBase):
 class UserActiveUpdate(BaseModel):
     """Deactivates the account when false, restores it when true."""
     is_active: bool
+
+
+class UserUpdate(BaseModel):
+    """A partial edit: send only the fields that should change.
+
+    Omitting `password` leaves the current one in place, which is what makes a
+    plain rename possible without an administrator having to invent a new
+    password for somebody else.
+    """
+    name: Optional[str] = None
+    password: Optional[str] = None
 
 
 class PermissionInfo(BaseModel):

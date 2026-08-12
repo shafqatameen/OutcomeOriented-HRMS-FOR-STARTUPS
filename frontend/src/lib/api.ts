@@ -167,6 +167,12 @@ export const setUserAccess = (userId: number, permissions: string[]) =>
 export const createUser = (data: { name: string; role: string; password: string }) =>
   fetchAPI("/users", { method: "POST", body: JSON.stringify(data) });
 /**
+ * Renames an account and/or sets a new password. Omit `password` to leave the
+ * existing one untouched — sending an empty string is refused, not ignored.
+ */
+export const updateUser = (userId: number, data: { name?: string; password?: string }) =>
+  fetchAPI(`/users/${userId}`, { method: "PATCH", body: JSON.stringify(data) });
+/**
  * Blocks or restores sign-in. Deactivating takes effect on that person's next
  * request, not just their next login, and leaves their tasks and points alone.
  */
