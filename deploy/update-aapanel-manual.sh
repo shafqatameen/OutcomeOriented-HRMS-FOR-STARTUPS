@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 #
 # Deploy for the manually-cloned aaPanel setup: app lives at
-# /www/wwwroot/OutcomeOriented-HRMS-FOR-STARTUPS and backend/frontend run as
-# plain background processes (uvicorn + `next start`) rather than systemd
-# units or pm2. This kills whatever is bound to their ports and relaunches
-# them the same way aaPanel originally started them.
+# /www/wwwroot/OutcomeOriented-HRMS-FOR-STARTUPS, owned by and run as the
+# `www` user, with backend/frontend as plain background processes (uvicorn +
+# `next start`) rather than systemd units or pm2. This kills whatever is
+# bound to their ports and relaunches them the same way aaPanel originally
+# started them.
 #
-# Run as root, by hand or via the GitHub Actions deploy workflow:
+# Run as the www user (matches the repo's ownership and the running
+# processes), by hand or via the GitHub Actions deploy workflow:
 #
-#   /www/wwwroot/OutcomeOriented-HRMS-FOR-STARTUPS/deploy/update-aapanel-manual.sh
+#   su -s /bin/bash www -c '/www/wwwroot/OutcomeOriented-HRMS-FOR-STARTUPS/deploy/update-aapanel-manual.sh'
 #
 set -euo pipefail
 
@@ -20,7 +22,6 @@ FRONTEND_PORT="${FRONTEND_PORT:-3010}"
 log() { printf '\n\033[1;34m==>\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
-[[ $EUID -eq 0 ]] || die "run as root"
 [[ -d "$APP_DIR/.git" ]] || die "$APP_DIR is not a git checkout"
 
 log "Fetching $BRANCH"

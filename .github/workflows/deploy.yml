@@ -22,7 +22,9 @@ jobs:
           password: ${{ secrets.DEPLOY_PASSWORD }}
           command_timeout: 15m
           script: |
-            cd /www/wwwroot/OutcomeOriented-HRMS-FOR-STARTUPS
-            git fetch --quiet origin main
-            git reset --hard --quiet origin/main
-            bash deploy/update-aapanel-manual.sh
+            su -s /bin/bash www -c '
+              cd /www/wwwroot/OutcomeOriented-HRMS-FOR-STARTUPS &&
+              git fetch --quiet origin main &&
+              git reset --hard --quiet origin/main &&
+              bash deploy/update-aapanel-manual.sh
+            '
