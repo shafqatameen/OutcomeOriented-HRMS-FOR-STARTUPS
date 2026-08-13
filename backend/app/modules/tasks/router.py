@@ -6,6 +6,8 @@ from app.core.database import get_db
 from app.core.integrity import Blocker, deletion_blocked
 from app.modules.tasks import models, schemas
 from app.modules.tasks.points import effective_points, points_are_pinned
+from app.modules.goals import models as goal_models
+from app.modules.users import models as user_models
 from app.modules.auth.dependencies import require_permission, require_user
 
 router = APIRouter(tags=["Tasks"])
@@ -249,3 +251,137 @@ def complete_task(task_id: int, db: Session = Depends(get_db), current_user=Depe
     db.add(ledger)
     db.commit()
     return {"message": "Task completed", "points_awarded": points}
+
+
+# Declared after PATCH /tasks/reorder on purpose: FastAPI matches routes in
+# declaration order, and "reorder" would otherwise be swallowed by {task_id}.
+@router.patch("/tasks/{task_id}", response_model=schemas.Task)
+def update_task(
+    task_id: int,
+    update: schemas.TaskUpdate,
+    db: Session = Depends(get_db),
+    _admin=Depends(require_permission("admin.tasks")),
+):
+    """Edits one task in place: retitle it, reassign it, repoint it, relink it.
+
+    Only the fields actually present in the body are written, so a dialog that
+    submits a new title cannot blank the assignee by omission.
+
+    Reassigning or repricing a completed task is refused. Its points are already
+    in the ledger, under the person who earned them and at the value awarded;
+    neither write would move the ledger with it, so the leaderboard would start
+    disagreeing with the task it was computed from.
+    """
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    sent = update.model_fields_set
+    if not sent:
+        raise HTTPException(status_code=400, detail="Provide at least one field to update")
+
+    if task.status == "Completed" and ({"user_id", "points"} & sent):
+        raise HTTPException(
+            status_code=400,
+            detail="Completed tasks cannot be reassigned or repriced - their points are already in the ledger",
+        )
+
+    # Everything is validated before anything is written, so a rejected field
+    # cannot leave an earlier one half-applied.
+    if "title" in sent:
+        title = (update.title or "").strip()
+        if not title:
+            raise HTTPException(status_code=400, detail="Title must not be empty")
+
+    if "user_id" in sent:
+        if update.user_id is None:
+            raise HTTPException(status_code=400, detail="A task must stay assigned to someone")
+        assignee = (
+            db.query(user_models.User).filter(user_models.User.id == update.user_id).first()
+        )
+        if not assignee:
+            raise HTTPException(status_code=404, detail="User not found")
+        # A deactivated account cannot sign in, so it could never complete what
+        # it was handed - the task would sit on the board unfinishable.
+        if not assignee.is_active:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{assignee.name} is deactivated and cannot be assigned tasks",
+            )
+
+    if "milestone_id" in sent and update.milestone_id is not None:
+        milestone = (
+            db.query(goal_models.Milestone)
+            .filter(goal_models.Milestone.id == update.milestone_id)
+            .first()
+        )
+        if not milestone:
+            raise HTTPException(status_code=404, detail="Milestone not found")
+
+    if "points" in sent and update.points is not None and update.points < 0:
+        raise HTTPException(status_code=400, detail="Points must not be negative")
+
+    if "title" in sent:
+        task.title = title
+    if "user_id" in sent:
+        task.user_id = update.user_id
+    if "milestone_id" in sent:
+        task.milestone_id = update.milestone_id
+    if "is_recurring" in sent:
+        task.is_recurring = bool(update.is_recurring)
+    # A null here is a deliberate un-pin: the task goes back to inheriting its
+    # category's default (see tasks.points).
+    if "points" in sent:
+        task.points = update.points
+
+    db.commit()
+    db.refresh(task)
+    return task
+
+
+@router.delete("/tasks/{task_id}")
+def delete_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    _admin=Depends(require_permission("admin.tasks")),
+):
+    """Deletes a pending task. Refuses once its points have been awarded.
+
+    SQLite is running without `PRAGMA foreign_keys` (see core.database), so
+    deleting a completed task would not fail on its ledger rows - it would leave
+    them pointing at nothing. The leaderboard's per-category totals join the
+    ledger back through the task, so those points would quietly vanish from
+    every category column while still counting in the all-time total, with no
+    way to reconstruct which column they belonged to. Completed tasks are
+    therefore refused with the same structured 409 the other deletes use.
+    """
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    ledger_count, awarded = (
+        db.query(
+            func.count(models.PointLedger.id),
+            func.coalesce(func.sum(models.PointLedger.points_awarded), 0),
+        )
+        .filter(models.PointLedger.task_id == task_id)
+        .one()
+    )
+
+    if task.status == "Completed" or ledger_count:
+        blocker = (
+            Blocker("point ledger entries", ledger_count, f"{awarded} points already awarded")
+            if ledger_count
+            else Blocker("completed tasks", 1, "already counted on the leaderboard")
+        )
+        raise deletion_blocked(
+            entity="task",
+            name=task.title,
+            blockers=[blocker],
+            remedy="Completed tasks are the record the leaderboard is built from, so they stay.",
+        )
+
+    db.delete(task)
+    db.commit()
+
+    return {"message": "Task deleted", "task_id": task_id}

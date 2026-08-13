@@ -9,10 +9,16 @@ import {
   getMilestones,
   reorderTasks,
   moveTask,
+  updateTask,
+  deleteTask,
+  asDeletionBlocked,
+  type TaskUpdate,
 } from "@/lib/api";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import ContextHeader from "@/components/ContextHeader";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import SortableTaskList, { TaskRow, type SortableTask } from "@/components/SortableTaskList";
+import TaskEditDialog from "@/components/TaskEditDialog";
 import TaskHistory, { type FilterGoal, type FilterMilestone } from "@/components/TaskHistory";
 import {
   DndContext,
@@ -46,6 +52,14 @@ export type TasksView =
 
 const isCompleted = (task: Task) => task.status === "Completed";
 const isPending = (task: Task) => !isCompleted(task);
+
+/**
+ * Nothing stops a task title being a paragraph long, and the confirmation
+ * heading is not where anyone reads one — the row it came from is still on the
+ * board behind the dialog.
+ */
+const clampTitle = (title: string, max = 60) =>
+  title.length > max ? `${title.slice(0, max).trimEnd()}…` : title;
 
 const UNCATEGORIZED = "uncategorized";
 const containerIdFor = (categoryId: number | null) =>
@@ -87,13 +101,24 @@ function reorderWithinColumn(
   });
 }
 
-export default function TasksClient({ view = { kind: "all" } }: { view?: TasksView }) {
+export default function TasksClient({
+  view = { kind: "all" },
+  canManage = false,
+}: {
+  view?: TasksView;
+  /** `admin.tasks`. Hiding the controls is convenience — the API enforces it too. */
+  canManage?: boolean;
+}) {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [users, setUsers] = useState<{ id: number; name: string }[]>([]);
+  const [users, setUsers] = useState<{ id: number; name: string; is_active?: boolean }[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [goals, setGoals] = useState<FilterGoal[]>([]);
   const [milestones, setMilestones] = useState<FilterMilestone[]>([]);
   const [reorderError, setReorderError] = useState<string | null>(null);
+
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const loadTasks = () => {
     getTasks().then(setTasks).catch(console.error);
@@ -113,12 +138,14 @@ export default function TasksClient({ view = { kind: "all" } }: { view?: TasksVi
     return user ? user.name.toUpperCase() : "Unknown";
   };
 
+  /** What a task is worth right now: its own value if pinned, else its category's. */
+  const pointsOf = (task: Task) =>
+    task.points ?? categories.find((c) => c.id === task.category_id)?.default_points ?? 0;
+
+  // Rows only carry the sortable fields, so the full task has to be found first.
   const getTaskPoints = (task: SortableTask) => {
     const full = tasks.find((t) => t.id === task.id);
-    if (!full) return 0;
-    if (full.points !== undefined && full.points !== null) return full.points;
-    const cat = categories.find((c) => c.id === full.category_id);
-    return cat ? cat.default_points : 0;
+    return full ? pointsOf(full) : 0;
   };
 
   const handleComplete = async (taskId: number) => {
@@ -127,6 +154,35 @@ export default function TasksClient({ view = { kind: "all" } }: { view?: TasksVi
       loadTasks();
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const editingTask = tasks.find((task) => task.id === editingId) ?? null;
+
+  /** Rejections are left to propagate: the dialog shows them and stays open. */
+  const handleSaveEdit = async (taskId: number, patch: TaskUpdate) => {
+    await updateTask(taskId, patch);
+    setEditingId(null);
+    loadTasks();
+  };
+
+  const startDelete = (taskId: number) => {
+    setDeleteError(null);
+    setPendingDelete(tasks.find((task) => task.id === taskId) ?? null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete) return;
+    setDeleteError(null);
+    try {
+      await deleteTask(pendingDelete.id);
+      setPendingDelete(null);
+      loadTasks();
+    } catch (e) {
+      // A 409 here means somebody completed it while the dialog was open, so
+      // the board is refreshed to show it has moved to the history.
+      if (asDeletionBlocked(e)) loadTasks();
+      setDeleteError(e instanceof Error ? e.message : "Could not delete the task");
     }
   };
 
@@ -274,7 +330,7 @@ export default function TasksClient({ view = { kind: "all" } }: { view?: TasksVi
       />
 
       {reorderError && (
-        <div className="rounded border border-destructive/50 p-3 text-sm text-destructive">
+        <div className="rounded border border-destructive/50 p-3 text-sm wrap-anywhere text-destructive">
           {reorderError}. The list has been put back the way it was.
         </div>
       )}
@@ -320,6 +376,8 @@ export default function TasksClient({ view = { kind: "all" } }: { view?: TasksVi
                     getPoints={getTaskPoints}
                     getAssignee={getUserName}
                     onComplete={handleComplete}
+                    onEdit={canManage ? setEditingId : undefined}
+                    onDelete={canManage ? startDelete : undefined}
                     emptyMessage="Nothing here yet. Drag a task in."
                   />
                 </CardContent>
@@ -335,7 +393,11 @@ export default function TasksClient({ view = { kind: "all" } }: { view?: TasksVi
               task={activeTask}
               points={getTaskPoints(activeTask)}
               assignee={getUserName(activeTask.user_id)}
+              // Inert while dragging, but present so the card being carried is
+              // the same shape as the row it was lifted out of.
               onComplete={() => {}}
+              onEdit={canManage ? () => {} : undefined}
+              onDelete={canManage ? () => {} : undefined}
               isOverlay
             />
           )}
@@ -354,6 +416,43 @@ export default function TasksClient({ view = { kind: "all" } }: { view?: TasksVi
           getAssignee={getUserName}
         />
       )}
+
+      <TaskEditDialog
+        // Remounts per row, which is what seeds the form with that task's values.
+        key={editingId ?? "closed"}
+        task={editingTask}
+        users={users}
+        goals={goals}
+        milestones={milestones}
+        inheritedPoints={
+          categories.find((c) => c.id === editingTask?.category_id)?.default_points ?? 0
+        }
+        onClose={() => setEditingId(null)}
+        onSave={handleSaveEdit}
+      />
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title={`Delete ${pendingDelete ? clampTitle(pendingDelete.title) : "task"}?`}
+        description="This cannot be undone."
+        confirmLabel="Delete task"
+        destructive
+        error={deleteError}
+        onConfirm={handleConfirmDelete}
+      >
+        {pendingDelete && (
+          <div className="rounded border bg-muted/40 p-3 text-sm">
+            <span className="font-medium">
+              {getUserName(pendingDelete.user_id)} loses this {pointsOf(pendingDelete)}-point task.
+            </span>{" "}
+            <span className="text-muted-foreground">
+              Nothing already earned changes — points only move when a task is completed, and a
+              completed task cannot be deleted at all.
+            </span>
+          </div>
+        )}
+      </ConfirmDialog>
     </div>
   );
 }

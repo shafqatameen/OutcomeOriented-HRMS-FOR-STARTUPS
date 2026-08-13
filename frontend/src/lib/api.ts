@@ -140,6 +140,33 @@ export const moveTask = (taskId: number, categoryId: number, taskIds: number[]) 
     body: JSON.stringify({ category_id: categoryId, task_ids: taskIds }),
   });
 export const createTask = (data: any) => fetchAPI("/tasks", { method: "POST", body: JSON.stringify(data) });
+
+/**
+ * A partial task edit. `undefined` is dropped by JSON.stringify and leaves the
+ * field alone; an explicit `null` is what releases a pinned point value back to
+ * the category default, or unlinks the milestone.
+ *
+ * Category is not editable here — dragging the task to another column is, which
+ * is PATCH /tasks/{id}/move.
+ */
+export type TaskUpdate = {
+  title?: string;
+  user_id?: number;
+  milestone_id?: number | null;
+  is_recurring?: boolean;
+  points?: number | null;
+};
+
+/** Reassigning or repricing a completed task is refused: its points are already banked. */
+export const updateTask = (taskId: number, data: TaskUpdate) =>
+  fetchAPI(`/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify(data) });
+
+/**
+ * Only ever succeeds for a task nobody has completed — one with ledger entries
+ * is refused with a 409 (see `asDeletionBlocked`), because the leaderboard is
+ * computed from those rows.
+ */
+export const deleteTask = (taskId: number) => fetchAPI(`/tasks/${taskId}`, { method: "DELETE" });
 export const createCategory = (data: any) => fetchAPI("/categories", { method: "POST", body: JSON.stringify(data) });
 export const updateCategory = (categoryId: number, data: any) =>
   fetchAPI(`/categories/${categoryId}`, { method: "PATCH", body: JSON.stringify(data) });

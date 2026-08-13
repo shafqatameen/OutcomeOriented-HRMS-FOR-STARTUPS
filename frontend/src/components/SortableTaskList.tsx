@@ -3,7 +3,7 @@
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CheckCircle2, GripVertical } from "lucide-react";
+import { CheckCircle2, GripVertical, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -20,11 +20,22 @@ type TaskRowProps = {
   points: number;
   assignee: string;
   onComplete: (taskId: number) => void;
+  /** Omitted for accounts without `admin.tasks`, which hides the control entirely. */
+  onEdit?: (taskId: number) => void;
+  onDelete?: (taskId: number) => void;
   /** Rendered inside DragOverlay, where sortable transforms must not apply. */
   isOverlay?: boolean;
 };
 
-export function TaskRow({ task, points, assignee, onComplete, isOverlay = false }: TaskRowProps) {
+export function TaskRow({
+  task,
+  points,
+  assignee,
+  onComplete,
+  onEdit,
+  onDelete,
+  isOverlay = false,
+}: TaskRowProps) {
   const {
     attributes,
     listeners,
@@ -40,7 +51,9 @@ export function TaskRow({ task, points, assignee, onComplete, isOverlay = false 
       ref={isOverlay ? undefined : setNodeRef}
       style={isOverlay ? undefined : { transform: CSS.Transform.toString(transform), transition }}
       className={cn(
-        "flex items-center gap-2 rounded border bg-card p-3",
+        // Wraps rather than squeezing: below roughly 15rem of row width the
+        // actions drop onto their own line instead of crushing the title.
+        "flex flex-wrap items-center gap-2 rounded border bg-card p-3",
         // The overlay is the thing following the cursor, so the original row
         // fades in place rather than disappearing.
         !isOverlay && isDragging && "opacity-40",
@@ -60,8 +73,8 @@ export function TaskRow({ task, points, assignee, onComplete, isOverlay = false 
         <GripVertical className="h-4 w-4" />
       </button>
 
-      <div className="min-w-0 flex-1">
-        <div className="font-semibold">
+      <div className="min-w-0 flex-1 basis-32">
+        <div className="font-semibold wrap-break-word">
           {task.title}
           <span className="ml-1 text-sm font-normal text-muted-foreground">({points}p)</span>
           {/* Recurrence is no longer the grouping axis, so surface it per row. */}
@@ -74,10 +87,45 @@ export function TaskRow({ task, points, assignee, onComplete, isOverlay = false 
         <div className="text-sm text-muted-foreground">Assigned to: {assignee}</div>
       </div>
 
-      <Button onClick={() => onComplete(task.id)} className="flex shrink-0 gap-2">
-        <CheckCircle2 className="h-4 w-4" />
-        Complete
-      </Button>
+      {/* Stacked, not strung out along the row: three controls side by side left
+          the title a few characters wide in a three-column board. Complete keeps
+          the top line — it is the action almost every row is here for. */}
+      <div className="ml-auto flex shrink-0 flex-col gap-2">
+        <Button onClick={() => onComplete(task.id)} className="w-full gap-2">
+          <CheckCircle2 className="h-4 w-4" />
+          Complete
+        </Button>
+        {(onEdit || onDelete) && (
+          // Icon-only, following the goals admin rows, and split across
+          // Complete's width so the block stays one tidy rectangle.
+          <div className="flex gap-2">
+            {onEdit && (
+              <Button
+                variant="outline"
+                size="icon"
+                className="flex-1"
+                aria-label={`Edit ${task.title}`}
+                title="Edit task"
+                onClick={() => onEdit(task.id)}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
+            {onDelete && (
+              <Button
+                variant="destructive"
+                size="icon"
+                className="flex-1"
+                aria-label={`Delete ${task.title}`}
+                title="Delete task"
+                onClick={() => onDelete(task.id)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -89,6 +137,8 @@ type SortableTaskListProps = {
   getPoints: (task: SortableTask) => number;
   getAssignee: (userId: number) => string;
   onComplete: (taskId: number) => void;
+  onEdit?: (taskId: number) => void;
+  onDelete?: (taskId: number) => void;
   emptyMessage: string;
 };
 
@@ -102,6 +152,8 @@ export default function SortableTaskList({
   getPoints,
   getAssignee,
   onComplete,
+  onEdit,
+  onDelete,
   emptyMessage,
 }: SortableTaskListProps) {
   const { setNodeRef, isOver } = useDroppable({ id: containerId });
@@ -125,6 +177,8 @@ export default function SortableTaskList({
               points={getPoints(task)}
               assignee={getAssignee(task.user_id)}
               onComplete={onComplete}
+              onEdit={onEdit}
+              onDelete={onDelete}
             />
           ))
         )}
