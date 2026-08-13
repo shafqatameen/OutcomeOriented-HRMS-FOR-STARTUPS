@@ -29,3 +29,7 @@ jobs:
               git reset --hard --quiet origin/main &&
               bash deploy/update-aapanel-manual.sh
             '
+            # Runs as root (not inside the su block above): aaPanel's project
+            # state file is root-owned, so this needs root to actually update
+            # the dashboard rather than just starting the process.
+            bash /www/wwwroot/OutcomeOriented-HRMS-FOR-STARTUPS/deploy/restart-frontend-aapanel.sh
