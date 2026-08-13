@@ -60,11 +60,17 @@ kill_port() {
 
 log "Restarting backend (port $BACKEND_PORT)"
 kill_port "$BACKEND_PORT"
-( cd "$APP_DIR/backend" && setsid nohup ./.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port "$BACKEND_PORT" >>uvicorn.log 2>&1 </dev/null & )
+# setsid (without -f) silently no-ops if this subshell is already a process
+# group leader, leaving the process attached to the SSH session and hanging
+# the deploy connection even after everything else has finished. -f forces
+# a real fork so detachment always happens.
+( cd "$APP_DIR/backend" && setsid -f nohup ./.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port "$BACKEND_PORT" >>uvicorn.log 2>&1 </dev/null & )
+disown -a 2>/dev/null || true
 
 log "Restarting frontend (port $FRONTEND_PORT)"
 kill_port "$FRONTEND_PORT"
-( cd "$APP_DIR/frontend" && setsid nohup npm run start >>next.log 2>&1 </dev/null & )
+( cd "$APP_DIR/frontend" && setsid -f nohup npm run start >>next.log 2>&1 </dev/null & )
+disown -a 2>/dev/null || true
 
 sleep 3
 failed=0
