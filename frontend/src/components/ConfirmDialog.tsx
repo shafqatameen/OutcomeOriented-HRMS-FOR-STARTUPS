@@ -79,7 +79,10 @@ export default function ConfirmDialog({
         {children}
 
         {error && (
-          <div className="rounded border border-destructive/50 p-3 text-sm text-destructive">
+          // wrap-anywhere, not wrap-break-word: an API message can be a single
+          // token with no break opportunity in it at all, and a stack-shaped one
+          // would otherwise push a scrollbar under the whole dialog.
+          <div className="rounded border border-destructive/50 p-3 text-sm wrap-anywhere text-destructive">
             {error}
           </div>
         )}

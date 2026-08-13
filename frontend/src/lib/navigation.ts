@@ -11,6 +11,7 @@ import {
   ListChecks,
   Layers,
   ShieldCheck,
+  Users,
   Download,
   type LucideIcon,
 } from "lucide-react";
@@ -126,6 +127,10 @@ export function buildDestinations({ categories, goals }: NavigationData): Destin
         {
           id: "admin-categories", label: "Categories", route: "/admin/categories",
           glyph: Tags, permission: "admin.categories",
+        },
+        {
+          id: "admin-people", label: "People", route: "/admin/people",
+          glyph: Users, permission: "admin.users",
         },
         {
           id: "admin-access", label: "Access", route: "/admin/access",

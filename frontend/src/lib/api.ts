@@ -140,6 +140,33 @@ export const moveTask = (taskId: number, categoryId: number, taskIds: number[]) 
     body: JSON.stringify({ category_id: categoryId, task_ids: taskIds }),
   });
 export const createTask = (data: any) => fetchAPI("/tasks", { method: "POST", body: JSON.stringify(data) });
+
+/**
+ * A partial task edit. `undefined` is dropped by JSON.stringify and leaves the
+ * field alone; an explicit `null` is what releases a pinned point value back to
+ * the category default, or unlinks the milestone.
+ *
+ * Category is not editable here — dragging the task to another column is, which
+ * is PATCH /tasks/{id}/move.
+ */
+export type TaskUpdate = {
+  title?: string;
+  user_id?: number;
+  milestone_id?: number | null;
+  is_recurring?: boolean;
+  points?: number | null;
+};
+
+/** Reassigning or repricing a completed task is refused: its points are already banked. */
+export const updateTask = (taskId: number, data: TaskUpdate) =>
+  fetchAPI(`/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify(data) });
+
+/**
+ * Only ever succeeds for a task nobody has completed — one with ledger entries
+ * is refused with a 409 (see `asDeletionBlocked`), because the leaderboard is
+ * computed from those rows.
+ */
+export const deleteTask = (taskId: number) => fetchAPI(`/tasks/${taskId}`, { method: "DELETE" });
 export const createCategory = (data: any) => fetchAPI("/categories", { method: "POST", body: JSON.stringify(data) });
 export const updateCategory = (categoryId: number, data: any) =>
   fetchAPI(`/categories/${categoryId}`, { method: "PATCH", body: JSON.stringify(data) });
@@ -163,12 +190,59 @@ export const getUserAccess = () => fetchAPI("/users/access");
 /** Replaces one account's grants with exactly this set. */
 export const setUserAccess = (userId: number, permissions: string[]) =>
   fetchAPI(`/users/${userId}/access`, { method: "PUT", body: JSON.stringify({ permissions }) });
+/** New accounts start on the default grant set; widen it from the Access page. */
+export const createUser = (data: { name: string; role: string; password: string }) =>
+  fetchAPI("/users", { method: "POST", body: JSON.stringify(data) });
+/**
+ * Renames an account and/or sets a new password. Omit `password` to leave the
+ * existing one untouched — sending an empty string is refused, not ignored.
+ */
+export const updateUser = (userId: number, data: { name?: string; password?: string }) =>
+  fetchAPI(`/users/${userId}`, { method: "PATCH", body: JSON.stringify(data) });
+/**
+ * Blocks or restores sign-in. Deactivating takes effect on that person's next
+ * request, not just their next login, and leaves their tasks and points alone.
+ */
+export const setUserActive = (userId: number, isActive: boolean) =>
+  fetchAPI(`/users/${userId}/active`, {
+    method: "PATCH",
+    body: JSON.stringify({ is_active: isActive }),
+  });
+/**
+ * Only ever succeeds for an account with no tasks and no points — anything else
+ * is refused with a 409 (see `asDeletionBlocked`) naming what still points at it.
+ */
+export const deleteUser = (userId: number) => fetchAPI(`/users/${userId}`, { method: "DELETE" });
 export const getLoginOptions = () => fetchAPI("/auth/login-options");
 export const getGoals = () => fetchAPI("/goals");
 export const createGoal = (data: any) => fetchAPI("/goals", { method: "POST", body: JSON.stringify(data) });
+export const updateGoal = (goalId: number, data: { title: string }) =>
+  fetchAPI(`/goals/${goalId}`, { method: "PATCH", body: JSON.stringify(data) });
+/** How many milestones and tasks a delete would take with it. Asked before confirming. */
+export const getGoalUsage = (goalId: number) => fetchAPI(`/goals/${goalId}/usage`);
+/**
+ * Omit `cascade` only for a goal with no milestones — the API refuses with a 409
+ * (see `asDeletionBlocked`) while any still belong to it. Cascading deletes the
+ * milestones but never the tasks: those are unlinked and keep their points.
+ */
+export const deleteGoal = (goalId: number, cascade = false) =>
+  fetchAPI(`/goals/${goalId}${cascade ? "?cascade=true" : ""}`, { method: "DELETE" });
 export const getMilestones = () => fetchAPI("/milestones");
 export const createMilestone = (data: any) => fetchAPI("/milestones", { method: "POST", body: JSON.stringify(data) });
 export const completeMilestone = (milestoneId: number) => fetchAPI(`/milestones/${milestoneId}`, { method: "PATCH", body: JSON.stringify({ status: "Completed" }) });
+/** Renames a milestone. Allowed even once it is completed. */
+export const updateMilestone = (milestoneId: number, data: { title: string }) =>
+  fetchAPI(`/milestones/${milestoneId}`, { method: "PATCH", body: JSON.stringify(data) });
+/** How many tasks a delete would unlink. Asked before confirming. */
+export const getMilestoneUsage = (milestoneId: number) =>
+  fetchAPI(`/milestones/${milestoneId}/usage`);
+/**
+ * Omit `cascade` only for a milestone with no tasks — the API refuses with a 409
+ * (see `asDeletionBlocked`) while any point at it. Cascading unlinks those tasks
+ * rather than deleting them.
+ */
+export const deleteMilestone = (milestoneId: number, cascade = false) =>
+  fetchAPI(`/milestones/${milestoneId}${cascade ? "?cascade=true" : ""}`, { method: "DELETE" });
 /** Which sheets this account may download, and roughly how big each one is. */
 export const getExportManifest = (startDate?: string, endDate?: string) => {
   const params = new URLSearchParams();

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.core.base import Base
 
@@ -10,6 +10,10 @@ class User(Base):
     role = Column(String, default="Member") # Admin vs Member
     total_points = Column(Integer, default=0)
     password_hash = Column(String, nullable=True)
+    #: Deactivation is a login block, not a hide: the account keeps its tasks,
+    #: its ledger rows and its leaderboard position. Existing sessions stop
+    #: working too, because get_current_user re-reads this on every request.
+    is_active = Column(Boolean, nullable=False, server_default="1", default=True)
 
     tasks = relationship("app.modules.tasks.models.Task", back_populates="user")
     ledger_entries = relationship("app.modules.tasks.models.PointLedger", back_populates="user")

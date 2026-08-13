@@ -24,6 +24,7 @@ def login_options(db: Session = Depends(get_db)):
     return (
         db.query(user_models.User)
         .filter(user_models.User.password_hash.isnot(None))
+        .filter(user_models.User.is_active.is_(True))
         .all()
     )
 
@@ -33,6 +34,14 @@ def login(payload: schemas.LoginRequest, response: Response, db: Session = Depen
     user = db.query(user_models.User).filter(user_models.User.name == payload.name).first()
     if not user or not user.password_hash or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid name or password")
+
+    # Deliberately checked after the password: answering "deactivated" to a wrong
+    # guess would turn this endpoint into a way to enumerate accounts.
+    if not user.is_active:
+        raise HTTPException(
+            status_code=403,
+            detail="This account has been deactivated. Ask an administrator to restore it.",
+        )
 
     token = create_access_token(user.id, user.name, user.role)
     response.set_cookie(

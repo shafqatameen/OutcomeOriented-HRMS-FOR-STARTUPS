@@ -122,7 +122,7 @@ export default function AdminForm() {
           <div>
             <label className="flex items-center space-x-2 text-sm font-medium">
               <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} />
-              <span>Is Recurring Daily? (Adjacent Task)</span>
+              <span>Is Recurring Daily?</span>
             </label>
           </div>
           <Button type="submit" className="flex gap-2">

@@ -37,6 +37,24 @@ class TaskBase(BaseModel):
 class TaskCreate(TaskBase):
     pass
 
+class TaskUpdate(BaseModel):
+    """A partial edit of one task: send only the fields that should change.
+
+    An explicit null is meaningful on the two nullable fields - it is how a
+    pinned point value is released back to the category default, and how a task
+    is unlinked from its milestone. Omission has to mean something different
+    from null for that to work, which is why the router reads
+    `model_fields_set` rather than testing each value for None.
+
+    Category is absent on purpose: moving a task between columns is
+    PATCH /tasks/{id}/move, which also places it in the destination's order.
+    """
+    title: Optional[str] = None
+    user_id: Optional[int] = None
+    milestone_id: Optional[int] = None
+    is_recurring: Optional[bool] = None
+    points: Optional[int] = None
+
 class Task(TaskBase):
     id: int
     status: str

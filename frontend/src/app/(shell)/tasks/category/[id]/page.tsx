@@ -25,6 +25,9 @@ export default async function TasksCategoryPage({
   if (!category) notFound();
 
   return (
-    <TasksClient view={{ kind: "category", categoryId, categoryName: category.name }} />
+    <TasksClient
+      view={{ kind: "category", categoryId, categoryName: category.name }}
+      canManage={can(user, "admin.tasks")}
+    />
   );
 }

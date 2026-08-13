@@ -15,7 +15,14 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
     payload = decode_access_token(token)
     if not payload:
         return None
-    return db.query(user_models.User).filter(user_models.User.id == int(payload["sub"])).first()
+    user = db.query(user_models.User).filter(user_models.User.id == int(payload["sub"])).first()
+
+    # Sessions last seven days, so deactivation would be toothless until the
+    # token expired if the flag were only checked at login. Reading it here
+    # makes it bite on the deactivated account's very next request instead.
+    if user is not None and not user.is_active:
+        return None
+    return user
 
 
 def require_user(current_user=Depends(get_current_user)):
