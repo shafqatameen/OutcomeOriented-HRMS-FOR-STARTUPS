@@ -30,7 +30,7 @@ PERMISSIONS: List[Permission] = [
     Permission("admin.tasks", "Assign and manage tasks", "Administration",
                "Create and assign tasks, and edit or delete the ones on the board."),
     Permission("admin.goals", "Manage goals and milestones", "Administration",
-               "Create goals and milestones, and mark milestones complete."),
+               "Create, rename, and delete goals and milestones, and mark milestones complete."),
     Permission("admin.categories", "Manage categories", "Administration",
                "Create categories and change their default points."),
     Permission("admin.users", "Manage accounts and access", "Administration",

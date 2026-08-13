@@ -20,5 +20,5 @@ export default async function GoalPage({ params }: { params: Promise<{ id: strin
   const goal = goals.find((g) => g.id === goalId);
   if (!goal) notFound();
 
-  return <GoalsClient goalId={goalId} title={goal.title} />;
+  return <GoalsClient goalId={goalId} title={goal.title} canManage={can(user, "admin.goals")} />;
 }

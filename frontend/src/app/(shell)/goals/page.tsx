@@ -5,5 +5,5 @@ import GoalsClient from "./GoalsClient";
 export default async function Page() {
   const user = await requireUser();
   if (!can(user, "goals.view")) return <NoAccess feature="Goals" />;
-  return <GoalsClient />;
+  return <GoalsClient canManage={can(user, "admin.goals")} />;
 }
