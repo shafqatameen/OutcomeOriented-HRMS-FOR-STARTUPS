@@ -22,6 +22,7 @@ jobs:
           password: ${{ secrets.DEPLOY_PASSWORD }}
           command_timeout: 15m
           script: |
+            [ -x /usr/local/bin/uv ] || cp /root/.local/bin/uv /usr/local/bin/uv
             su -s /bin/bash www -c '
               cd /www/wwwroot/OutcomeOriented-HRMS-FOR-STARTUPS &&
               git fetch --quiet origin main &&
