@@ -293,3 +293,6 @@ For issues and support, please open an issue in the repository.
 
 Released under the [MIT License](LICENSE). Copyright (c) 2026 Shafqat Ameen and
 contributors.
+
+<!-- CI/CD deploy test: 2026-08-13 -->
+
