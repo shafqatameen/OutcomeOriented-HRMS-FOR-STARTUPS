@@ -37,7 +37,14 @@ if [[ -n "${pid:-}" ]]; then
   kill -9 "$pid" 2>/dev/null || true
 fi
 
-"$AAPANEL_PYTHON" "$NODEJS_SERVICE" "$FRONTEND_AAPANEL_NAME" restart
+# `restart` errors out ("Project did not start") when aaPanel's own state
+# already says "Stopped" -- it seems to have an internal stop step that
+# aborts the whole thing when it finds nothing tracked to stop. Doing it as
+# two explicit steps works regardless of what aaPanel currently believes:
+# stop is allowed to fail (nothing tracked, or already stopped), start
+# always runs.
+"$AAPANEL_PYTHON" "$NODEJS_SERVICE" "$FRONTEND_AAPANEL_NAME" stop || true
+"$AAPANEL_PYTHON" "$NODEJS_SERVICE" "$FRONTEND_AAPANEL_NAME" start
 
 sleep 3
 if ss -ltn 2>/dev/null | grep -q ":${FRONTEND_PORT} "; then
