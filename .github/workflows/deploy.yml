@@ -21,4 +21,8 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           password: ${{ secrets.DEPLOY_PASSWORD }}
           command_timeout: 15m
-          script: /opt/hrms/deploy/update.sh
+          script: |
+            cd /www/wwwroot/OutcomeOriented-HRMS-FOR-STARTUPS
+            git fetch --quiet origin main
+            git reset --hard --quiet origin/main
+            bash deploy/update-aapanel-manual.sh
