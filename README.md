@@ -87,8 +87,17 @@ browser code uses `NEXT_PUBLIC_API_URL`.
 ### Tasks
 
 - Drag to reorder within a category, or move between categories
+- Edit a task from the board — title, assignee, milestone, points, recurrence.
+  Only the fields that changed are sent, so concurrent edits to different fields
+  of the same task don't overwrite each other
+- Delete a pending task, behind a confirmation naming who loses what
 - Per-category views and a completion history
 - Optional milestone linkage
+
+Completion is the point of no return. A completed task can still be renamed or
+relinked, but it cannot be reassigned, repriced, moved between categories, or
+deleted — its points are already in the ledger under the person who earned them,
+and none of those writes would move the ledger with them.
 
 ### Goals
 
@@ -113,8 +122,8 @@ themselves out. Everyone else holds explicit permission keys, defined in
 | `tasks.complete` | Mark tasks done and earn points |
 | `tasks.organize` | Reorder and move tasks |
 | `goals.view` | Goals, milestones, progress |
-| `admin.tasks` | Create and assign tasks |
-| `admin.goals` | Manage goals and milestones |
+| `admin.tasks` | Create and assign tasks, and edit or delete them |
+| `admin.goals` | Create, rename and delete goals and milestones; complete milestones |
 | `admin.categories` | Manage categories and default points |
 | `admin.users` | Manage accounts and grant access |
 | `data.export` | Export own data |
@@ -223,6 +232,7 @@ origin keeps the session cookie first-party and removes CORS from the browser pa
 | `DELETE` | `/categories/{id}` |
 | `GET` / `POST` | `/tasks` |
 | `PATCH` | `/tasks/reorder` |
+| `PATCH` / `DELETE` | `/tasks/{id}` |
 | `PATCH` | `/tasks/{id}/move` |
 | `POST` | `/tasks/{id}/complete` |
 
@@ -230,8 +240,11 @@ origin keeps the session cookie first-party and removes CORS from the browser pa
 | Method | Path |
 |---|---|
 | `GET` / `POST` | `/goals` |
+| `PATCH` / `DELETE` | `/goals/{id}` |
+| `GET` | `/goals/{id}/usage` |
 | `GET` / `POST` | `/milestones` |
-| `PATCH` | `/milestones/{id}` |
+| `PATCH` / `DELETE` | `/milestones/{id}` |
+| `GET` | `/milestones/{id}/usage` |
 
 ### Leaderboard and Export
 | Method | Path |
