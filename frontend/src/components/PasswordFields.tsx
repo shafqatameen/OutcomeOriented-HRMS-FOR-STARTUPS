@@ -14,8 +14,15 @@ import { Input } from "@/components/ui/input";
  * decided by whoever is using the browser.
  */
 
-/** Kept in step with the API's own minimum in auth/passwords.py. */
-export const MIN_PASSWORD_LENGTH = 12;
+/**
+ * Kept in step with the API's own MIN_LENGTH in auth/passwords.py.
+ *
+ * Two constants rather than one fetched from the server, because this one only
+ * decides when to grey out a button — the API rejects a short password
+ * regardless. If they ever disagree the API wins, and the visible symptom is a
+ * submit that fails with a message instead of a disabled button.
+ */
+export const MIN_PASSWORD_LENGTH = 8;
 
 export type PasswordState = { password: string; confirm: string };
 

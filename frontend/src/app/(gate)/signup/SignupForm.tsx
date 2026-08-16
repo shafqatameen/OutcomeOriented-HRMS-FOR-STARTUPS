@@ -5,7 +5,7 @@ import { getSignupStatus, signup, type SignupStatus } from "@/lib/api";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MailCheck, UserPlus } from "lucide-react";
+import { MailCheck, PlugZap, UserPlus } from "lucide-react";
 
 /**
  * Asks for an address, and nothing else that matters.
@@ -23,6 +23,7 @@ export function SignupForm() {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [status, setStatus] = useState<SignupStatus | null>(null);
+  const [unreachable, setUnreachable] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -31,9 +32,19 @@ export function SignupForm() {
     // A server with no SMTP settings cannot finish a sign-up, so the form is
     // never shown on one. Filling it in and getting a 503 teaches nobody
     // anything they could act on.
+    //
+    // A failed *request*, though, is tracked separately and must not be folded
+    // into `enabled: false`. They look identical on screen and mean opposite
+    // things: one is a decision somebody made, the other is a backend that is
+    // down or out of date. Reporting the second as the first sends people to
+    // ask an administrator for an account when the actual fix is to start the
+    // API - which is exactly what a stale backend answering 404 here produced.
     getSignupStatus()
-      .then(setStatus)
-      .catch(() => setStatus({ enabled: false, mail_ready: false }));
+      .then((s) => {
+        setStatus(s);
+        setUnreachable(false);
+      })
+      .catch(() => setUnreachable(true));
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,6 +83,42 @@ export function SignupForm() {
             <Link href="/login" className="text-primary underline-offset-4 hover:underline">
               Back to sign in
             </Link>
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (unreachable) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <PlugZap className="h-4 w-4" />
+            Cannot reach the server
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p>
+            The sign-up page could not ask the API whether it is accepting accounts. This
+            is a connection problem, not a decision — the API is probably not running, or
+            is running an older build without this endpoint.
+          </p>
+          <p className="text-muted-foreground">
+            If you are developing: start the backend with{" "}
+            <code className="rounded bg-muted px-1 py-0.5">
+              uvicorn app.main:app --reload --host :: --port 8000
+            </code>
+            .
+          </p>
+          <p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="text-primary underline-offset-4 hover:underline"
+            >
+              Try again
+            </button>
           </p>
         </CardContent>
       </Card>
