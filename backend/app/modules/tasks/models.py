@@ -21,6 +21,11 @@ class Task(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     category_id = Column(Integer, ForeignKey("categories.id"))
     milestone_id = Column(Integer, ForeignKey("milestones.id"), nullable=True)
+    # The domain axis (see app.modules.org.models). Nullable because category
+    # already carries the track axis and pricing on its own: a task with no
+    # function is still a complete, completable, scorable task - it just lands
+    # in the panel's Unassigned bucket instead of under a pillar.
+    function_id = Column(Integer, ForeignKey("functions.id"), nullable=True, index=True)
     is_recurring = Column(Boolean, default=False)
     status = Column(String, default="Pending")
     points = Column(Integer, nullable=True)
@@ -31,6 +36,7 @@ class Task(Base):
     user = relationship("app.modules.users.models.User", back_populates="tasks")
     category = relationship("app.modules.tasks.models.Category", back_populates="tasks")
     milestone = relationship("app.modules.goals.models.Milestone", back_populates="tasks")
+    function = relationship("app.modules.org.models.Function", back_populates="tasks")
     ledger_entries = relationship("app.modules.tasks.models.PointLedger", back_populates="task")
 
 class PointLedger(Base):
@@ -39,6 +45,14 @@ class PointLedger(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True)
     points_awarded = Column(Integer)
+    #: How long the work actually took, captured at completion.
+    #:
+    #: Points gamify; minutes diagnose - and the two disagree on purpose. The
+    #: Drain track is worth zero points, so in a points-only mix the hours lost
+    #: to it render as 0% and vanish from the very view built to expose them.
+    #: Nullable because every row written before this column existed has no
+    #: honest value to backfill, and a guess would be worse than a gap.
+    minutes = Column(Integer, nullable=True)
     timestamp = Column(DateTime, default=get_ist_now)
 
     user = relationship("app.modules.users.models.User", back_populates="ledger_entries")

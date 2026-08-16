@@ -3,66 +3,125 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Palette values are the literal hex from DESIGN.md rather than an oklch
+ * approximation of them. The design doc is the source of truth and it quotes
+ * exact values (HN beige #f6f6ef, YC orange #ff6600); round-tripping those
+ * through oklch drifted the page ground toward off-white and lost the beige. */
 :root {
-  --radius: 0.625rem;
+  --radius: 2px;
 
-  --background: oklch(0.98 0.005 90);
-  --foreground: oklch(0.18 0.01 60);
+  --background: #f6f6ef;
+  --foreground: #1a1a1a;
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.01 60);
+  --card: #ffffff;
+  --card-foreground: #1a1a1a;
 
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.01 60);
+  --popover: #ffffff;
+  --popover-foreground: #1a1a1a;
 
-  --primary: oklch(0.66 0.2 41);
-  --primary-foreground: oklch(0.99 0.005 90);
+  --primary: #ff6600;
+  --primary-foreground: #ffffff;
+  /* Hover is a darker orange, not a transparency of the same orange: an
+   * opacity step lets the page ground bleed through and reads as washed out
+   * against beige. */
+  --primary-hover: #e65c00;
 
-  --secondary: oklch(0.95 0.008 90);
-  --secondary-foreground: oklch(0.22 0.01 60);
+  --secondary: #eeeee6;
+  --secondary-foreground: #1a1a1a;
 
-  --muted: oklch(0.95 0.008 90);
-  --muted-foreground: oklch(0.52 0.015 70);
+  --muted: #f0f0e8;
+  --muted-foreground: #828282;
 
-  --accent: oklch(0.95 0.008 90);
-  --accent-foreground: oklch(0.22 0.01 60);
+  --accent: #f0f0e8;
+  --accent-foreground: #1a1a1a;
 
-  --destructive: oklch(0.58 0.22 27);
-  --destructive-foreground: oklch(0.99 0.005 90);
+  --destructive: #cc0000;
+  --destructive-foreground: #ffffff;
 
-  --border: oklch(0.9 0.01 80);
-  --input: oklch(0.9 0.01 80);
-  --ring: oklch(0.66 0.2 41);
+  --success: #008000;
+  --success-foreground: #ffffff;
+
+  --border: #dcdcd2;
+  --input: #dcdcd2;
+  --ring: #ff6600;
+
+  /* Rank fills. Ranks 1-3 are the only place a non-accent fill is allowed, and
+   * they are warm metals chosen to sit on beige rather than Tailwind's stock
+   * yellow/slate, which pulled cool grey into a warm palette. */
+  --rank-first: #b8860b;
+  --rank-second: #8a8a80;
+  --rank-third: #a0522d;
+
+  /* Pillar identity.
+   *
+   * Two values per pillar, because one cannot do both jobs. `-fill` is the
+   * literal cell colour from the source spreadsheet, used only where the shape
+   * is large enough to read it: a swatch or a bar segment. `-ink` is a variant
+   * chosen to stay legible as a 3px rule or as label text on this ground -
+   * Customer's #fadb57 is invisible as a hairline on white, and CEO's #666666
+   * disappears against the dark card.
+   *
+   * These are never card fills or button backgrounds. Primary orange stays the
+   * only accent on the page, per DESIGN.md. */
+  --pillar-ceo-fill: #666666;
+  --pillar-ceo-ink: #5c5c5c;
+  --pillar-product-fill: #52818b;
+  --pillar-product-ink: #47727b;
+  --pillar-customer-fill: #fadb57;
+  --pillar-customer-ink: #96731a;
+  --pillar-business-fill: #954f72;
+  --pillar-business-ink: #954f72;
+  --pillar-life-fill: #00b050;
+  --pillar-life-ink: #007a37;
+  --pillar-unassigned-fill: #c4c4bb;
+  --pillar-unassigned-ink: #82827a;
 }
 
 .dark {
-  --background: oklch(0.17 0.01 70);
-  --foreground: oklch(0.96 0.005 90);
+  --background: #1a1a1a;
+  --foreground: #e8e8e8;
 
-  --card: oklch(0.21 0.012 70);
-  --card-foreground: oklch(0.96 0.005 90);
+  --card: #222222;
+  --card-foreground: #e8e8e8;
 
-  --popover: oklch(0.21 0.012 70);
-  --popover-foreground: oklch(0.96 0.005 90);
+  --popover: #222222;
+  --popover-foreground: #e8e8e8;
 
-  --primary: oklch(0.7 0.19 42);
-  --primary-foreground: oklch(0.17 0.01 70);
+  --primary: #ff6600;
+  --primary-foreground: #ffffff;
+  --primary-hover: #ff7a1f;
 
-  --secondary: oklch(0.27 0.014 70);
-  --secondary-foreground: oklch(0.96 0.005 90);
+  --secondary: #2a2a2a;
+  --secondary-foreground: #e8e8e8;
 
-  --muted: oklch(0.27 0.014 70);
-  --muted-foreground: oklch(0.71 0.015 80);
+  --muted: #262626;
+  --muted-foreground: #9a9a9a;
 
-  --accent: oklch(0.27 0.014 70);
-  --accent-foreground: oklch(0.96 0.005 90);
+  --accent: #2a2a2a;
+  --accent-foreground: #e8e8e8;
 
-  --destructive: oklch(0.65 0.2 25);
-  --destructive-foreground: oklch(0.96 0.005 90);
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
 
-  --border: oklch(0.3 0.014 70);
-  --input: oklch(0.32 0.014 70);
-  --ring: oklch(0.7 0.19 42);
+  --success: #3fb950;
+  --success-foreground: #1a1a1a;
+
+  --border: #333333;
+  --input: #333333;
+  --ring: #ff6600;
+
+  --rank-first: #d4a017;
+  --rank-second: #9a9a90;
+  --rank-third: #c07040;
+
+  /* Only the ink variants move: the fills are the spreadsheet's own colours and
+   * stay recognisable at swatch size on either ground. */
+  --pillar-ceo-ink: #a8a8a8;
+  --pillar-product-ink: #7fb3bd;
+  --pillar-customer-ink: #e6c752;
+  --pillar-business-ink: #c98bab;
+  --pillar-life-ink: #3fb950;
+  --pillar-unassigned-ink: #8a8a80;
 }
 
 @theme inline {
@@ -74,6 +133,7 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -82,14 +142,28 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-rank-first: var(--rank-first);
+  --color-rank-second: var(--rank-second);
+  --color-rank-third: var(--rank-third);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  /* Verdana is the HN signature and holds up at the small sizes this app runs
+   * at. `--font-heading` exists because card.tsx and dialog.tsx already ship a
+   * `font-heading` class; without the token that class compiled to nothing. */
+  --font-sans: Verdana, Geneva, sans-serif;
+  --font-heading: Verdana, Geneva, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Sharp corners, per DESIGN.md. Containers get the one extra pixel; inner
+   * elements stay tighter. */
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 3px;
+  --radius-xl: 3px;
 }
 
 @layer base {
@@ -97,10 +171,30 @@
     border-color: var(--border);
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Respect a user's reduced-motion setting over the smooth-scroll default. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
   body {
     background-color: var(--background);
     color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.4;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Figures line up column to column, so a leaderboard reads as a spreadsheet
+   * instead of ragged prose. */
+  table {
+    font-variant-numeric: tabular-nums;
   }
 }

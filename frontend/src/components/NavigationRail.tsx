@@ -7,9 +7,11 @@ import { Trophy, Menu, X, PanelLeftClose, PanelLeftOpen, Lock, LogIn } from "luc
 import { cn } from "@/lib/utils";
 import {
   buildDestinations,
+  isBranchOpen,
   isDestinationActive,
   isDestinationPermitted,
   isSubDestinationActive,
+  type NavItem,
   type NavigationData,
 } from "@/lib/navigation";
 import LogoutButton from "@/components/LogoutButton";
@@ -51,6 +53,80 @@ type NavigationRailProps = {
   /** Feeds the dynamic sub-items under Tasks and Goals. */
   data: NavigationData;
 };
+
+type NavBranchProps = {
+  items: NavItem[];
+  pathname: string;
+  allows: (key: string) => boolean;
+  /** 1 for a top-level row's children, 2 for theirs, and so on. */
+  depth: number;
+};
+
+/**
+ * Every level of the rail below the top one, drawn by calling itself.
+ *
+ * One component for all depths rather than one per depth: the row is the same
+ * row wherever it sits, and only two things are allowed to vary with depth — how
+ * far it is indented, which the nested list carries, and how loud it is, which
+ * steps down once and then stops. That keeps a fourth level from needing any
+ * code, and keeps it from being illegible if someone adds one.
+ *
+ * Depth is passed rather than measured because the recursion already knows it,
+ * and a row that had to look upward to find out where it was would be the sort
+ * of coupling this shape exists to avoid.
+ */
+function NavBranch({ items, pathname, allows, depth }: NavBranchProps) {
+  // Rows the account cannot open are removed at every level, not disabled: the
+  // ancestor already communicates the section, and a wall of locked rows is
+  // noise. Only the top level, drawn below, keeps its locked rows visible.
+  const visible = items.filter((item) => !item.permission || allows(item.permission));
+  if (visible.length === 0) return null;
+
+  // The indent lives on the list, so each level nests inside the last instead of
+  // every row having to know its own total offset.
+  return (
+    <ul className={cn("ml-4 flex flex-col gap-0.5", depth === 1 && "mb-1")}>
+      {visible.map((item) => {
+        const isActive = isSubDestinationActive(item.route, pathname);
+        const children = item.children ?? [];
+        const isOpen = children.length > 0 && isBranchOpen(item, pathname);
+
+        return (
+          <li key={item.id}>
+            <Link
+              href={item.route}
+              data-destination={item.id}
+              aria-current={isActive ? "page" : undefined}
+              // Goal, milestone and category names are user-supplied and can
+              // outrun the rail, so keep the full text reachable.
+              title={item.label}
+              className={cn(
+                "relative flex items-center gap-2 rounded-md py-1.5 pl-4 pr-3",
+                "before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-border",
+                depth >= 2 ? "text-xs" : "text-sm",
+                isActive
+                  ? "bg-secondary font-medium text-foreground before:bg-primary before:w-0.5"
+                  : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+              )}
+            >
+              <item.glyph className={cn("shrink-0", depth >= 2 ? "h-3 w-3" : "h-3.5 w-3.5")} />
+              <span className="truncate">{item.label}</span>
+            </Link>
+
+            {isOpen && (
+              <NavBranch
+                items={children}
+                pathname={pathname}
+                allows={allows}
+                depth={depth + 1}
+              />
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 export default function NavigationRail({ user, data }: NavigationRailProps) {
   const pathname = usePathname();
@@ -171,9 +247,9 @@ export default function NavigationRail({ user, data }: NavigationRailProps) {
           className="flex flex-1 flex-col gap-1 overflow-y-auto p-2"
         >
           {destinations.map((destination) => {
-            const { id, label, route, glyph: Glyph, children } = destination;
+            const { id, label, route, glyph: Glyph, children, badge } = destination;
             const isRestricted = !isDestinationPermitted(destination, allows);
-            const isActive = isDestinationActive(route, pathname);
+            const isActive = isDestinationActive(destination, pathname);
             // Sub-items the account cannot open are removed, not disabled: the
             // parent already communicates the section, and a wall of locked rows
             // is noise.
@@ -206,6 +282,36 @@ export default function NavigationRail({ user, data }: NavigationRailProps) {
                   className={cn("h-4 w-4 shrink-0", isActive && !isRestricted && "text-primary")}
                 />
                 <span className={cn("truncate", !showLabels && "sr-only")}>{label}</span>
+                {/* Never shown on a locked row: the lock is the more useful
+                    thing to say, and a count of items you cannot open is not
+                    information. Hidden at zero — an empty inbox is the goal, so
+                    reaching it should quieten the rail rather than badge a 0. */}
+                {!isRestricted && badge !== undefined && badge > 0 && (
+                  showLabels ? (
+                    // aria-hidden because the sr-only line below says the same
+                    // thing in a sentence. Without this the row announces as
+                    // "Inbox 2 2 waiting" — the number twice, once bare.
+                    <span
+                      aria-hidden
+                      data-badge
+                      className="ml-auto shrink-0 rounded-full bg-primary px-1.5 py-0.5 text-[10px] leading-none font-semibold text-primary-foreground tabular-nums"
+                    >
+                      {badge > 99 ? "99+" : badge}
+                    </span>
+                  ) : (
+                    // Collapsed the number has nowhere to sit, but "there is
+                    // something waiting" is the half worth keeping.
+                    <span
+                      aria-hidden
+                      className="absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full bg-primary"
+                    />
+                  )
+                )}
+                {/* Announced regardless of the rail's width, since the collapsed
+                    form is a bare dot. */}
+                {!isRestricted && badge !== undefined && badge > 0 && (
+                  <span className="sr-only">{badge} waiting</span>
+                )}
                 {isRestricted && showLabels && (
                   <Lock className="ml-auto h-3 w-3 shrink-0" aria-hidden />
                 )}
@@ -239,33 +345,12 @@ export default function NavigationRail({ user, data }: NavigationRailProps) {
                 </Link>
 
                 {showChildren && (
-                  <ul className="mb-1 flex flex-col gap-0.5">
-                    {visibleChildren.map((child) => {
-                      const isChildActive = isSubDestinationActive(child.route, pathname);
-                      return (
-                        <li key={child.id}>
-                          <Link
-                            href={child.route}
-                            data-destination={child.id}
-                            aria-current={isChildActive ? "page" : undefined}
-                            // Goal and category names are user-supplied and can
-                            // outrun the rail, so keep the full text reachable.
-                            title={child.label}
-                            className={cn(
-                              "relative ml-4 flex items-center gap-2 rounded-md py-1.5 pl-4 pr-3 text-sm",
-                              "before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-border",
-                              isChildActive
-                                ? "bg-secondary font-medium text-foreground before:bg-primary before:w-0.5"
-                                : "text-muted-foreground hover:bg-secondary hover:text-foreground",
-                            )}
-                          >
-                            <child.glyph className="h-3.5 w-3.5 shrink-0" />
-                            <span className="truncate">{child.label}</span>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <NavBranch
+                    items={visibleChildren}
+                    pathname={pathname}
+                    allows={allows}
+                    depth={1}
+                  />
                 )}
               </div>
             );

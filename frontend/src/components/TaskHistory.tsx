@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Select, selectClassName } from "@/components/ui/select";
 import { History, X } from "lucide-react";
 
 export type HistoryTask = {
@@ -55,8 +56,7 @@ const EMPTY_FILTERS: Filters = {
   maxPoints: "",
 };
 
-const selectClass =
-  "border rounded p-2 text-sm bg-white dark:bg-slate-900 max-w-[12rem] truncate";
+const selectClass = `${selectClassName} max-w-[12rem] truncate`;
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -166,7 +166,7 @@ export default function TaskHistory({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center gap-2">
-        <History className="w-5 h-5 text-gray-500" />
+        <History className="w-5 h-5 text-muted-foreground" />
         <CardTitle>Task History</CardTitle>
         <span className="ml-auto text-xs text-muted-foreground">
           {isFiltered ? `${visible.length} of ${tasks.length}` : tasks.length}
@@ -185,7 +185,7 @@ export default function TaskHistory({
           </Field>
 
           <Field label="Category">
-            <select
+            <Select
               className={selectClass}
               value={filters.categoryId}
               onChange={(e) => set("categoryId", e.target.value)}
@@ -195,11 +195,11 @@ export default function TaskHistory({
                 <option key={c.id} value={c.id}>{c.name.trim()}</option>
               ))}
               <option value="none">No category</option>
-            </select>
+            </Select>
           </Field>
 
           <Field label="Completed by">
-            <select
+            <Select
               className={selectClass}
               value={filters.userId}
               onChange={(e) => set("userId", e.target.value)}
@@ -208,21 +208,21 @@ export default function TaskHistory({
               {users.map((u) => (
                 <option key={u.id} value={u.id}>{u.name.toUpperCase()}</option>
               ))}
-            </select>
+            </Select>
           </Field>
 
           <Field label="Goal">
-            <select className={selectClass} value={filters.goalId} onChange={(e) => selectGoal(e.target.value)}>
+            <Select className={selectClass} value={filters.goalId} onChange={(e) => selectGoal(e.target.value)}>
               <option value="">Any goal</option>
               {goals.map((g) => (
                 <option key={g.id} value={g.id}>{g.title}</option>
               ))}
               <option value="none">No goal</option>
-            </select>
+            </Select>
           </Field>
 
           <Field label="Milestone">
-            <select
+            <Select
               className={selectClass}
               value={filters.milestoneId}
               onChange={(e) => set("milestoneId", e.target.value)}
@@ -232,11 +232,11 @@ export default function TaskHistory({
                 <option key={m.id} value={m.id}>{m.title}</option>
               ))}
               <option value="none">No milestone</option>
-            </select>
+            </Select>
           </Field>
 
           <Field label="Type">
-            <select
+            <Select
               className={selectClass}
               value={filters.recurring}
               onChange={(e) => set("recurring", e.target.value as Filters["recurring"])}
@@ -244,7 +244,7 @@ export default function TaskHistory({
               <option value="any">Any type</option>
               <option value="daily">Daily only</option>
               <option value="oneoff">One-off only</option>
-            </select>
+            </Select>
           </Field>
 
           <Field label="Points">
@@ -284,23 +284,23 @@ export default function TaskHistory({
         </div>
 
         {tasks.length === 0 ? (
-          <div className="text-center text-sm text-slate-500 p-4">No completed tasks yet.</div>
+          <div className="text-center text-sm text-muted-foreground p-4">No completed tasks yet.</div>
         ) : visible.length === 0 ? (
-          <div className="text-center text-sm text-slate-500 p-4">
+          <div className="text-center text-sm text-muted-foreground p-4">
             No completed tasks match these filters.
           </div>
         ) : (
           visible.map((task) => (
             <div
               key={task.id}
-              className="flex flex-wrap items-center justify-between gap-2 p-3 border rounded bg-slate-50/50"
+              className="flex flex-wrap items-center justify-between gap-2 p-3 border rounded bg-muted/50"
             >
               <div className="min-w-0">
-                <div className="font-semibold line-through text-slate-500">
+                <div className="font-semibold line-through text-muted-foreground">
                   {task.title}
                   <span className="font-normal text-sm ml-1">({getPoints(task)}p)</span>
                 </div>
-                <div className="flex flex-wrap items-center gap-x-2 text-sm text-slate-400">
+                <div className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
                   <span>Completed by: {getAssignee(task.user_id)}</span>
                   {categoryName(task) && <span>· {categoryName(task)}</span>}
                   {goalTitle(task) && <span>· {goalTitle(task)}</span>}
@@ -308,7 +308,7 @@ export default function TaskHistory({
                   {task.is_recurring && <span>· Daily</span>}
                 </div>
               </div>
-              <Badge variant="outline" className="text-green-600 bg-green-50">
+              <Badge variant="success">
                 Done
               </Badge>
             </div>

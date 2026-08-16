@@ -120,7 +120,49 @@ else
   # Domain may have changed on a re-run; CORS must follow it.
   sed -i "s|^FRONTEND_ORIGIN=.*|FRONTEND_ORIGIN=https://$DOMAIN|" "$ENV_DIR/backend.env"
   grep -q '^COOKIE_SECURE=' "$ENV_DIR/backend.env" || echo 'COOKIE_SECURE=true' >>"$ENV_DIR/backend.env"
+  # The Google callback is an API path, so it follows the domain too. Google
+  # matches this string exactly, so a stale domain here fails every connection
+  # with redirect_uri_mismatch long after the rest of the app has moved on.
+  sed -i "s|^GOOGLE_REDIRECT_URI=.*|GOOGLE_REDIRECT_URI=https://$DOMAIN/api/integrations/google/callback|" "$ENV_DIR/backend.env"
 fi
+
+# Google Calendar, on the same footing as the mail keys below: the redirect URI
+# is derived because it is public and must track the domain, while the client id
+# and secret are left blank because this script lives in the repository and a
+# real secret written from it would be a committed secret. Blank client id means
+# the integration reports itself unconfigured and the rest of the app is
+# unaffected.
+if ! grep -q '^GOOGLE_CLIENT_ID=' "$ENV_DIR/backend.env"; then
+  log "Adding empty Google Calendar settings to $ENV_DIR/backend.env"
+  cat >>"$ENV_DIR/backend.env" <<EOF
+
+# OAuth client from console.cloud.google.com, with the Calendar API enabled.
+# Register GOOGLE_REDIRECT_URI below as an Authorised redirect URI, verbatim.
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=https://$DOMAIN/api/integrations/google/callback
+EOF
+fi
+
+# Mail keys are added empty and never given a value here: this script is in the
+# repository, so a real password written from it would be a committed password.
+# Fill them in on the server, then restart the backend. Blank MAIL_HOST simply
+# means mail is off - the app runs fine without it.
+if ! grep -q '^MAIL_HOST=' "$ENV_DIR/backend.env"; then
+  log "Adding empty mail settings to $ENV_DIR/backend.env - fill these in to enable mail"
+  cat >>"$ENV_DIR/backend.env" <<'EOF'
+
+# Outbound SMTP. 587 is STARTTLS, 465 is implicit TLS.
+MAIL_HOST=
+MAIL_PORT=587
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_FROM=
+MAIL_FROM_NAME=OutcomeOriented
+MAIL_TIMEOUT=15
+EOF
+fi
+
 chown root:"$APP_USER" "$ENV_DIR/backend.env"
 chmod 640 "$ENV_DIR/backend.env"
 
@@ -186,24 +228,31 @@ systemctl restart hrms-backend
 
 # The backend creates/migrates the SQLite database on startup; wait for it to be
 # answering before seeding, otherwise seed.py races the migration.
+#
+# Probed on /openapi.json because it is the only endpoint that is both public and
+# always present. The account list used to serve this purpose, but it was public
+# - it let anyone enumerate who had an account - and has been removed.
 for _ in $(seq 1 30); do
-  curl -fsS "http://127.0.0.1:$BACKEND_PORT/auth/login-options" >/dev/null 2>&1 && break
+  curl -fsS "http://127.0.0.1:$BACKEND_PORT/openapi.json" >/dev/null 2>&1 && break
   sleep 1
 done
 
-users_json="$(curl -fsS "http://127.0.0.1:$BACKEND_PORT/auth/login-options" 2>/dev/null || echo 'ERR')"
-if [[ "$users_json" == "ERR" ]]; then
+if ! curl -fsS "http://127.0.0.1:$BACKEND_PORT/openapi.json" >/dev/null 2>&1; then
   warn "backend is not responding; check: journalctl -u hrms-backend -n 50"
-elif [[ "$users_json" == "[]" ]]; then
-  log "Seeding initial accounts"
-  echo "    Save the passwords below — they are not stored in plaintext anywhere."
+else
+  # Run unconditionally: seed.py only creates accounts when there are none, only
+  # ever fills gaps on an existing database, and says which it did. That is a
+  # better place for the decision than a check out here, which had to guess.
+  log "Seeding initial accounts (skipped automatically if they already exist)"
+  echo "    Save any passwords printed below — they are not stored in plaintext anywhere."
   sudo -u "$APP_USER" env HOME="/home/$APP_USER" \
     SEED_PASSWORD_ABDU="${SEED_PASSWORD_ABDU:-}" \
     SEED_PASSWORD_ANNU="${SEED_PASSWORD_ANNU:-}" \
     SEED_PASSWORD_SAM="${SEED_PASSWORD_SAM:-}" \
+    SEED_EMAIL_ABDU="${SEED_EMAIL_ABDU:-}" \
+    SEED_EMAIL_ANNU="${SEED_EMAIL_ANNU:-}" \
+    SEED_EMAIL_SAM="${SEED_EMAIL_SAM:-}" \
     bash -c "cd '$APP_DIR/backend' && .venv/bin/python seed.py"
-else
-  log "Database already has accounts; skipping seed"
 fi
 
 systemctl enable --now hrms-frontend

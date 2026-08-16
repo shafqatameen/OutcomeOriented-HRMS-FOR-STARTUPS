@@ -8,9 +8,26 @@ from app.modules.tasks import models, schemas
 from app.modules.tasks.points import effective_points, points_are_pinned
 from app.modules.goals import models as goal_models
 from app.modules.users import models as user_models
+from app.modules.org import models as org_models
 from app.modules.auth.dependencies import require_permission, require_user
 
 router = APIRouter(tags=["Tasks"])
+
+
+def _require_function(db: Session, function_id: int) -> None:
+    """Refuses a function tag that does not resolve.
+
+    SQLite is running without `PRAGMA foreign_keys` (see core.database), so an
+    unchecked id would be accepted and the task would simply stop appearing under
+    any pillar on the panel - a silent loss rather than a visible error.
+    """
+    exists = (
+        db.query(org_models.Function.id)
+        .filter(org_models.Function.id == function_id)
+        .first()
+    )
+    if not exists:
+        raise HTTPException(status_code=404, detail="Function not found")
 
 @router.get("/categories", response_model=List[schemas.Category])
 def read_categories(db: Session = Depends(get_db), _user=Depends(require_user)):
@@ -139,6 +156,9 @@ def read_tasks(db: Session = Depends(get_db), _user=Depends(require_permission("
 
 @router.post("/tasks", response_model=schemas.Task)
 def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db), _admin=Depends(require_permission("admin.tasks"))):
+    if task.function_id is not None:
+        _require_function(db, task.function_id)
+
     next_position = (db.query(func.max(models.Task.position)).scalar() or 0) + 1
     db_task = models.Task(**task.dict(), position=next_position)
     db.add(db_task)
@@ -228,7 +248,18 @@ def move_task(
     }
 
 @router.post("/tasks/{task_id}/complete")
-def complete_task(task_id: int, db: Session = Depends(get_db), current_user=Depends(require_permission("tasks.complete"))):
+def complete_task(
+    task_id: int,
+    payload: Optional[schemas.TaskComplete] = None,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("tasks.complete")),
+):
+    """Marks a task done and appends to the ledger.
+
+    The body is optional so every existing caller that posts nothing keeps
+    working unchanged; sending `minutes` records how long the work took, which
+    is what lets the panel report a share of *time* rather than only of points.
+    """
     db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -236,6 +267,10 @@ def complete_task(task_id: int, db: Session = Depends(get_db), current_user=Depe
         raise HTTPException(status_code=400, detail="Task already completed")
     if current_user.role != "Admin" and current_user.id != db_task.user_id:
         raise HTTPException(status_code=403, detail="You can only complete your own tasks")
+
+    minutes = payload.minutes if payload else None
+    if minutes is not None and minutes < 0:
+        raise HTTPException(status_code=400, detail="Minutes must not be negative")
 
     db_task.status = "Completed"
 
@@ -246,11 +281,12 @@ def complete_task(task_id: int, db: Session = Depends(get_db), current_user=Depe
     ledger = models.PointLedger(
         user_id=db_task.user_id,
         task_id=db_task.id,
-        points_awarded=points
+        points_awarded=points,
+        minutes=minutes,
     )
     db.add(ledger)
     db.commit()
-    return {"message": "Task completed", "points_awarded": points}
+    return {"message": "Task completed", "points_awarded": points, "minutes": minutes}
 
 
 # Declared after PATCH /tasks/reorder on purpose: FastAPI matches routes in
@@ -318,6 +354,9 @@ def update_task(
         if not milestone:
             raise HTTPException(status_code=404, detail="Milestone not found")
 
+    if "function_id" in sent and update.function_id is not None:
+        _require_function(db, update.function_id)
+
     if "points" in sent and update.points is not None and update.points < 0:
         raise HTTPException(status_code=400, detail="Points must not be negative")
 
@@ -327,6 +366,9 @@ def update_task(
         task.user_id = update.user_id
     if "milestone_id" in sent:
         task.milestone_id = update.milestone_id
+    # A null here untags the task, dropping it into the panel's Unassigned bucket.
+    if "function_id" in sent:
+        task.function_id = update.function_id
     if "is_recurring" in sent:
         task.is_recurring = bool(update.is_recurring)
     # A null here is a deliberate un-pin: the task goes back to inheriting its

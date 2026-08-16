@@ -29,7 +29,12 @@ class CategoryUsage(BaseModel):
 class TaskBase(BaseModel):
     title: str
     user_id: int
+    #: The track axis: what this work does for you, and what it is worth.
     category_id: int
+    #: The domain axis: what kind of work it is. Optional, because a task is
+    #: complete and scorable without it - it just lands in the panel's
+    #: Unassigned bucket. See app.modules.org.models.
+    function_id: Optional[int] = None
     milestone_id: Optional[int] = None
     is_recurring: bool = False
     points: Optional[int] = None
@@ -52,6 +57,11 @@ class TaskUpdate(BaseModel):
     title: Optional[str] = None
     user_id: Optional[int] = None
     milestone_id: Optional[int] = None
+    #: Retagging is allowed even once the task is completed, unlike reassigning
+    #: or repricing. The ledger stores neither the function nor the pillar - the
+    #: panel resolves them through the task at read time - so this write moves
+    #: the points with it instead of stranding them.
+    function_id: Optional[int] = None
     is_recurring: Optional[bool] = None
     points: Optional[int] = None
 
@@ -61,6 +71,16 @@ class Task(TaskBase):
     position: int
     class Config:
         from_attributes = True
+
+class TaskComplete(BaseModel):
+    """Optional detail captured at the moment a task is marked done.
+
+    `minutes` is what turns the panel from a scoreboard into a time audit: the
+    Drain track is worth zero points, so hours lost to it are invisible in any
+    points-only mix. Omitting it is always allowed - a missing number is honest,
+    and a guessed one would quietly corrupt every share on the panel.
+    """
+    minutes: Optional[int] = None
 
 class TaskReorder(BaseModel):
     """Full ordered id list for ONE column, from top to bottom."""

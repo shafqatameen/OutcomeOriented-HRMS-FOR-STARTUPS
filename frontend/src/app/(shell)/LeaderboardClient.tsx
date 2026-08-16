@@ -6,7 +6,19 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Badge } from "@/components/ui/badge";
 import ContextHeader from "@/components/ContextHeader";
 import { RANGE_PRESETS, rangeLabel, resolveRange, type RangePreset } from "@/lib/date-range";
+import { Select, selectClassName } from "@/components/ui/select";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+
+/**
+ * DESIGN.md's chart palette: orange leads, then hues that stay distinguishable
+ * from it and from each other. The previous set was Tailwind's stock ramp,
+ * whose amber sat close enough to the brand orange to be confusable and whose
+ * red read as an error state on a chart that has none.
+ *
+ * Each series also gets its own dot shape (below), so the chart still resolves
+ * printed in grayscale or read by someone with colour vision deficiency.
+ */
+const CHART_SERIES_COLORS = ["#ff6600", "#0066cc", "#008000", "#8b5cf6", "#cc0000"];
 
 const CustomDot = (props: any) => {
   const { cx, cy, stroke, shape } = props;
@@ -110,21 +122,20 @@ export default function LeaderboardClient() {
               <div className="flex gap-2 items-center">
                 <input 
                   type="date" 
-                  className="border rounded p-2 text-sm bg-white dark:bg-slate-900"
+                  className={selectClassName}
                   value={customStart}
                   onChange={e => setCustomStart(e.target.value)}
                 />
-                <span className="text-sm text-slate-500">to</span>
+                <span className="text-sm text-muted-foreground">to</span>
                 <input 
                   type="date" 
-                  className="border rounded p-2 text-sm bg-white dark:bg-slate-900"
+                  className={selectClassName}
                   value={customEnd}
                   onChange={e => setCustomEnd(e.target.value)}
                 />
               </div>
             )}
-            <select 
-              className="border rounded p-2 text-sm bg-white dark:bg-slate-900"
+            <Select 
               value={timeFilter}
               onChange={(e) => setTimeFilter(e.target.value)}
             >
@@ -133,9 +144,8 @@ export default function LeaderboardClient() {
               <option value="90d">Last Quarter</option>
               <option value="all">All Time (1 Year)</option>
               <option value="custom">Custom...</option>
-            </select>
-            <select 
-              className="border rounded p-2 text-sm bg-white dark:bg-slate-900"
+            </Select>
+            <Select 
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value === "" ? "" : Number(e.target.value))}
             >
@@ -143,20 +153,26 @@ export default function LeaderboardClient() {
               {categories.map(c => (
                 <option key={c.id} value={c.id}>{c.name} Points</option>
               ))}
-            </select>
+            </Select>
           </div>
         </CardHeader>
         <CardContent>
           <div className="h-80 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="date" stroke="var(--muted-foreground)" fontSize={11} />
+                <YAxis stroke="var(--muted-foreground)" fontSize={11} />
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--popover)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "2px",
+                    fontSize: "11px",
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: "11px" }} />
                 {chartSeries.map((u, i) => {
-                  const colors = ["#ef4444", "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6"];
                   const shapes = ["circle", "square", "triangle", "diamond", "star"];
                   return (
                     <Line
@@ -164,7 +180,7 @@ export default function LeaderboardClient() {
                       type="monotone"
                       dataKey={u.name}
                       name={u.name.toUpperCase()}
-                      stroke={colors[i % colors.length]}
+                      stroke={CHART_SERIES_COLORS[i % CHART_SERIES_COLORS.length]}
                       strokeWidth={2} 
                       dot={(props: any) => <CustomDot {...props} shape={shapes[i % shapes.length]} />}
                       activeDot={{ r: 8 }} 
@@ -186,30 +202,29 @@ export default function LeaderboardClient() {
                 <input
                   type="date"
                   aria-label="Matrix range start"
-                  className="border rounded p-2 text-sm bg-white dark:bg-slate-900"
+                  className={selectClassName}
                   value={matrixStart}
                   onChange={(e) => setMatrixStart(e.target.value)}
                 />
-                <span className="text-sm text-slate-500">to</span>
+                <span className="text-sm text-muted-foreground">to</span>
                 <input
                   type="date"
                   aria-label="Matrix range end"
-                  className="border rounded p-2 text-sm bg-white dark:bg-slate-900"
+                  className={selectClassName}
                   value={matrixEnd}
                   onChange={(e) => setMatrixEnd(e.target.value)}
                 />
               </div>
             )}
-            <select
+            <Select
               aria-label="Point matrix time range"
-              className="border rounded p-2 text-sm bg-white dark:bg-slate-900"
               value={matrixRange}
               onChange={(e) => setMatrixRange(e.target.value as RangePreset)}
             >
               {RANGE_PRESETS.map((preset) => (
                 <option key={preset.value} value={preset.value}>{preset.label}</option>
               ))}
-            </select>
+            </Select>
           </div>
         </CardHeader>
         <CardContent>
@@ -221,26 +236,32 @@ export default function LeaderboardClient() {
                 <TableHead>User</TableHead>
                 {/* One column per category, so a column labelled with a category
                     name holds that category's points. */}
+                {/* Numeric columns right-align so the digits stack. */}
                 {categories.map(c => (
-                  <TableHead key={c.id}>{c.name.trim()}</TableHead>
+                  <TableHead key={c.id} className="text-right">{c.name.trim()}</TableHead>
                 ))}
-                <TableHead>Total Points</TableHead>
+                <TableHead className="text-right">Total Points</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.map((user, idx) => (
                 <TableRow key={user.user_id}>
                   <TableCell>
-                    {idx === 0 && <Badge className="bg-yellow-500">1st</Badge>}
-                    {idx === 1 && <Badge className="bg-slate-400">2nd</Badge>}
-                    {idx === 2 && <Badge className="bg-orange-700">3rd</Badge>}
+                    {/* Warm metals from the theme, not Tailwind's stock ramp.
+                        `bg-orange-700` in particular put a second orange on the
+                        page, which DESIGN.md reserves for the primary action. */}
+                    {idx === 0 && <Badge className="bg-rank-first">1st</Badge>}
+                    {idx === 1 && <Badge className="bg-rank-second">2nd</Badge>}
+                    {idx === 2 && <Badge className="bg-rank-third">3rd</Badge>}
                     {idx > 2 && idx + 1}
                   </TableCell>
                   <TableCell className="font-medium">{user.name.toUpperCase()}</TableCell>
                   {categories.map(c => (
-                    <TableCell key={c.id}>{user.category_points?.[String(c.id)] ?? 0}</TableCell>
+                    <TableCell key={c.id} className="text-right">
+                      {user.category_points?.[String(c.id)] ?? 0}
+                    </TableCell>
                   ))}
-                  <TableCell className="text-lg font-bold">
+                  <TableCell className="text-right text-lg font-bold">
                     {user.total_points}
                     {matrixRange !== "all" && (
                       <span className="ml-2 text-xs font-normal text-muted-foreground">

@@ -13,6 +13,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { Select } from "@/components/ui/select";
 import { PlusCircle, Pencil, Check, X, Trash2 } from "lucide-react";
 
 type Category = { id: number; name: string; default_points: number };
@@ -166,7 +167,7 @@ export default function CategoryAdminForm() {
         </CardHeader>
         <CardContent className="space-y-2">
           {categories.length === 0 ? (
-            <div className="text-center text-sm text-slate-500 p-4">No categories yet.</div>
+            <div className="text-center text-sm text-muted-foreground p-4">No categories yet.</div>
           ) : (
             categories.map((category) => (
               <div key={category.id} className="flex justify-between items-center p-3 border rounded gap-4">
@@ -193,7 +194,7 @@ export default function CategoryAdminForm() {
                 ) : (
                   <>
                     <span className="font-medium">
-                      {category.name} <span className="text-slate-400 font-normal">({category.default_points}p)</span>
+                      {category.name} <span className="text-muted-foreground font-normal">({category.default_points}p)</span>
                     </span>
                     <div className="flex gap-2">
                       <Button type="button" size="sm" variant="outline" onClick={() => startEdit(category)} className="flex gap-2">
@@ -253,8 +254,8 @@ export default function CategoryAdminForm() {
             ) : (
               <div>
                 <label className="block text-sm font-medium mb-1">Move these tasks to</label>
-                <select
-                  className="w-full border rounded p-2 bg-white dark:bg-slate-900"
+                <Select
+                  className="w-full"
                   value={reassignTo}
                   onChange={(e) => setReassignTo(e.target.value)}
                 >
@@ -264,7 +265,7 @@ export default function CategoryAdminForm() {
                       {c.name} ({c.default_points}p)
                     </option>
                   ))}
-                </select>
+                </Select>
                 <p className="mt-2 text-xs text-muted-foreground">
                   Tasks without a custom point value will be worth the destination&apos;s default.
                   {usage.completed_task_count > 0 &&

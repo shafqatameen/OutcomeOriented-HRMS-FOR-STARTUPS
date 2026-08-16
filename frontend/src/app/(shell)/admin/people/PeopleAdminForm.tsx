@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { Select } from "@/components/ui/select";
 import { PlusCircle, Trash2, UserMinus, UserCheck, Pencil, Check, X, Eye, EyeOff } from "lucide-react";
 
 /**
@@ -69,18 +70,22 @@ type Person = {
   role: string;
   total_points: number;
   is_active: boolean;
+  /** Null on accounts predating email sign-in; those still sign in by name. */
+  email: string | null;
 };
 
 export default function PeopleAdminForm({ currentUserId }: { currentUserId: number }) {
   const router = useRouter();
   const [people, setPeople] = useState<Person[]>([]);
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [role, setRole] = useState("Member");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
   const [editPassword, setEditPassword] = useState("");
 
   const [pendingDelete, setPendingDelete] = useState<Person | null>(null);
@@ -110,9 +115,10 @@ export default function PeopleAdminForm({ currentUserId }: { currentUserId: numb
     e.preventDefault();
     setError(null);
     try {
-      await createUser({ name, role, password });
+      await createUser({ name, role, password, email });
       reloadAll();
       setName("");
+      setEmail("");
       setRole("Member");
       setPassword("");
     } catch (err) {
@@ -123,6 +129,7 @@ export default function PeopleAdminForm({ currentUserId }: { currentUserId: numb
   const startEdit = (person: Person) => {
     setEditingId(person.id);
     setEditName(person.name);
+    setEditEmail(person.email ?? "");
     // Never prefilled: the stored password is a hash, so there is nothing
     // truthful to show, and a blank box reads correctly as "unchanged".
     setEditPassword("");
@@ -131,18 +138,27 @@ export default function PeopleAdminForm({ currentUserId }: { currentUserId: numb
 
   const cancelEdit = () => {
     setEditingId(null);
+    setEditEmail("");
     setEditPassword("");
   };
 
   const handleSaveEdit = async (userId: number) => {
     setError(null);
-    const payload: { name?: string; password?: string } = {};
+    const payload: { name?: string; password?: string; email?: string } = {};
     if (editName.trim()) payload.name = editName.trim();
     // Left blank means keep the current password. The API rejects an empty
     // string rather than hashing it, so it has to be omitted, not sent through.
     if (editPassword) payload.password = editPassword;
 
-    if (!payload.name && !payload.password) {
+    // Only sent when it actually changed. Blanking the box is "leave it alone",
+    // not "remove the address" — the API has no way to clear one back to null,
+    // because that would hand the account back to name sign-in.
+    const trimmedEmail = editEmail.trim();
+    if (trimmedEmail && trimmedEmail !== (people.find((p) => p.id === userId)?.email ?? "")) {
+      payload.email = trimmedEmail;
+    }
+
+    if (!payload.name && !payload.password && !payload.email) {
       cancelEdit();
       return;
     }
@@ -218,21 +234,33 @@ export default function PeopleAdminForm({ currentUserId }: { currentUserId: numb
         </CardHeader>
         <CardContent>
           <form onSubmit={handleCreate} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Name</label>
                 <Input value={name} onChange={(e) => setName(e.target.value)} required />
               </div>
               <div>
+                <label className="block text-sm font-medium mb-1">Email</label>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="them@example.com"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  required
+                />
+              </div>
+              <div>
                 <label className="block text-sm font-medium mb-1">Role</label>
-                <select
-                  className="w-full border rounded p-2 bg-white dark:bg-slate-900"
+                <Select
+                  className="w-full"
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
                 >
                   <option value="Member">Member</option>
                   <option value="Admin">Admin</option>
-                </select>
+                </Select>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Password</label>
@@ -240,8 +268,9 @@ export default function PeopleAdminForm({ currentUserId }: { currentUserId: numb
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              New members start with the default features. Widen or narrow that on the Access page.
-              An Admin bypasses every permission check.
+              The email address is how this person signs in, so give them one they can actually
+              reach. New members start with the default features — widen or narrow that on the
+              Access page. An Admin bypasses every permission check.
             </p>
             <Button type="submit" className="flex gap-2">
               <PlusCircle className="w-4 h-4" />
@@ -257,7 +286,7 @@ export default function PeopleAdminForm({ currentUserId }: { currentUserId: numb
         </CardHeader>
         <CardContent className="space-y-2">
           {people.length === 0 ? (
-            <div className="text-center text-sm text-slate-500 p-4">No accounts yet.</div>
+            <div className="text-center text-sm text-muted-foreground p-4">No accounts yet.</div>
           ) : (
             people.map((person) => {
               const isSelf = person.id === currentUserId;
@@ -268,12 +297,21 @@ export default function PeopleAdminForm({ currentUserId }: { currentUserId: numb
                 >
                   {editingId === person.id ? (
                     <>
-                      <div className="flex flex-1 gap-2 min-w-0">
+                      <div className="flex flex-1 flex-wrap gap-2 min-w-0">
                         <Input
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
                           className="max-w-xs"
                           placeholder="Name"
+                        />
+                        <Input
+                          type="email"
+                          value={editEmail}
+                          onChange={(e) => setEditEmail(e.target.value)}
+                          className="max-w-xs"
+                          autoCapitalize="none"
+                          spellCheck={false}
+                          placeholder={person.email ? "Email" : "Set an email to enable sign-in"}
                         />
                         <PasswordInput
                           value={editPassword}
@@ -293,20 +331,32 @@ export default function PeopleAdminForm({ currentUserId }: { currentUserId: numb
                     </>
                   ) : (
                   <>
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-medium truncate">{person.name}</span>
-                    <Badge variant="outline" className="text-muted-foreground">
-                      {person.role}
-                    </Badge>
-                    {!person.is_active && (
-                      <Badge variant="outline" className="text-destructive">
-                        Deactivated
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-medium truncate">{person.name}</span>
+                      <Badge variant="outline" className="text-muted-foreground">
+                        {person.role}
                       </Badge>
+                      {!person.is_active && (
+                        <Badge variant="outline" className="text-destructive">
+                          Deactivated
+                        </Badge>
+                      )}
+                      {isSelf && (
+                        <span className="text-xs text-muted-foreground">(you)</span>
+                      )}
+                      <span className="text-muted-foreground text-sm">{person.total_points}p</span>
+                    </div>
+                    {/* An account with no address is not broken — it signs in by
+                        name instead. Flagged rather than left blank so it is
+                        obvious which accounts still need one. */}
+                    {person.email ? (
+                      <span className="text-xs text-muted-foreground truncate">{person.email}</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        No email — signs in with the name “{person.name}”
+                      </span>
                     )}
-                    {isSelf && (
-                      <span className="text-xs text-muted-foreground">(you)</span>
-                    )}
-                    <span className="text-slate-400 text-sm">{person.total_points}p</span>
                   </div>
 
                   <div className="flex gap-2 shrink-0">

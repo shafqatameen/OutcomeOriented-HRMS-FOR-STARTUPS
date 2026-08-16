@@ -119,7 +119,7 @@ export default function GoalsClient({ goalId, title, canManage = false }: GoalsC
 
       {visibleGoals.length === 0 ? (
         <Card>
-          <CardContent className="text-center text-sm text-slate-500 p-4">No goals yet.</CardContent>
+          <CardContent className="text-center text-sm text-muted-foreground p-4">No goals yet.</CardContent>
         </Card>
       ) : (
         visibleGoals.map(goal => (
@@ -145,10 +145,7 @@ export default function GoalsClient({ goalId, title, canManage = false }: GoalsC
                 <>
                   <CardTitle>{goal.title}</CardTitle>
                   <div className="flex items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className={goal.progress_pct === 100 ? "text-green-600 bg-green-50" : undefined}
-                    >
+                    <Badge variant={goal.progress_pct === 100 ? "success" : "outline"}>
                       {goal.completed_milestone_count}/{goal.milestone_count} milestones
                     </Badge>
                     {canManage && (
@@ -180,27 +177,41 @@ export default function GoalsClient({ goalId, title, canManage = false }: GoalsC
               )}
             </CardHeader>
             <CardContent>
-              <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                <div className="h-full rounded-full bg-primary" style={{ width: `${goal.progress_pct}%` }} />
+              {/* 4px track, square-ish corners, and the number beside the bar
+                  rather than inside it - DESIGN.md's progress spec. The fill
+                  turns green only at 100%; below that it stays primary. */}
+              <div
+                role="progressbar"
+                aria-valuenow={goal.progress_pct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`${goal.title} progress`}
+                className="h-1 w-full overflow-hidden rounded-sm bg-muted"
+              >
+                <div
+                  className={`h-full ${goal.progress_pct === 100 ? "bg-success" : "bg-primary"}`}
+                  style={{ width: `${goal.progress_pct}%` }}
+                />
               </div>
-              <div className="text-xs text-slate-500 mt-1">{goal.progress_pct}% complete</div>
+              <div className="mt-1 text-[11px] text-muted-foreground">{goal.progress_pct}% complete</div>
 
-              <div className="mt-4 space-y-3 pl-3 border-l-2 border-slate-200 dark:border-slate-800">
+              <div className="mt-4 space-y-3 pl-3 border-l-2 border-border">
                 {goal.milestones.map((milestone: any) => (
-                  <div key={milestone.id}>
+                  // The rail links each milestone as `#milestone-<id>`, so the
+                  // anchor has to exist here. scroll-mt clears the compact
+                  // viewport's fixed header, which would otherwise cover the
+                  // row the link just jumped to.
+                  <div key={milestone.id} id={`milestone-${milestone.id}`} className="scroll-mt-20">
                     <div className="flex justify-between items-center p-3 border rounded">
                       <div className="flex items-center gap-2">
                         {milestone.progress_pct === 100 ? (
-                          <CheckCircle2 className="w-4 h-4 text-green-500" />
+                          <CheckCircle2 className="w-4 h-4 text-success" />
                         ) : (
-                          <Circle className="w-4 h-4 text-slate-400" />
+                          <Circle className="w-4 h-4 text-muted-foreground" />
                         )}
                         <span className="font-medium">{milestone.title}</span>
                       </div>
-                      <Badge
-                        variant="outline"
-                        className={milestone.progress_pct === 100 ? "text-green-600 bg-green-50" : undefined}
-                      >
+                      <Badge variant={milestone.progress_pct === 100 ? "success" : "outline"}>
                         {milestone.task_count === 0 && milestone.progress_pct !== 100
                           ? "No tasks yet"
                           : milestone.progress_pct === 100
@@ -208,9 +219,16 @@ export default function GoalsClient({ goalId, title, canManage = false }: GoalsC
                             : `${milestone.completed_task_count}/${milestone.task_count} tasks`}
                       </Badge>
                     </div>
-                    <div className="h-1.5 w-full rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden mt-1">
+                    <div
+                      role="progressbar"
+                      aria-valuenow={milestone.progress_pct}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label={`${milestone.title} progress`}
+                      className="mt-1 h-1 w-full overflow-hidden rounded-sm bg-muted"
+                    >
                       <div
-                        className={`h-full rounded-full ${milestone.progress_pct === 100 ? "bg-green-500" : "bg-blue-500"}`}
+                        className={`h-full ${milestone.progress_pct === 100 ? "bg-success" : "bg-primary"}`}
                         style={{ width: `${milestone.progress_pct}%` }}
                       />
                     </div>

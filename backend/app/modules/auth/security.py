@@ -1,4 +1,5 @@
 import os
+import secrets
 import bcrypt
 import jwt
 from datetime import datetime, timedelta, timezone
@@ -18,6 +19,15 @@ def hash_password(password: str) -> str:
 
 def verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode(), password_hash.encode())
+
+
+#: A real bcrypt hash of a value nobody knows, for login to check against when
+#: the account does not exist. Its only job is to cost the same as a genuine
+#: verification, so an unknown address and a wrong password take the same time.
+#:
+#: Generated at import rather than hardcoded: a literal in the source would be a
+#: fixed target, and this costs one hash once per process start.
+DUMMY_PASSWORD_HASH = hash_password(secrets.token_urlsafe(32))
 
 
 def create_access_token(user_id: int, name: str, role: str) -> str:

@@ -7,6 +7,7 @@ import {
   getCategories,
   getGoals,
   getMilestones,
+  getOrgTree,
   reorderTasks,
   moveTask,
   updateTask,
@@ -14,6 +15,7 @@ import {
   asDeletionBlocked,
   type TaskUpdate,
 } from "@/lib/api";
+import type { OrgPillar } from "@/lib/panel";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import ContextHeader from "@/components/ContextHeader";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -39,6 +41,8 @@ import { ListTodo, Flame, Tag, type LucideIcon } from "lucide-react";
 type Task = SortableTask & {
   category_id: number | null;
   milestone_id: number | null;
+  /** The domain tag. Null until someone tags it; see app.modules.org. */
+  function_id: number | null;
   points: number | null;
 };
 
@@ -73,8 +77,11 @@ const categoryIdFromContainer = (containerId: string) =>
  * the board never depends on a category being named a particular thing.
  */
 const CATEGORY_GLYPHS: Record<string, { icon: LucideIcon; className: string }> = {
-  Adjacent: { icon: ListTodo, className: "w-5 h-5 text-blue-500" },
-  Core: { icon: Flame, className: "w-5 h-5 text-orange-500" },
+  // The glyph distinguishes the column by shape, not by colour. `text-orange-500`
+  // here put a second orange on screen competing with the primary action, and
+  // `text-blue-500` pulled a cool hue into a warm palette.
+  Adjacent: { icon: ListTodo, className: "w-5 h-5 text-muted-foreground" },
+  Core: { icon: Flame, className: "w-5 h-5 text-muted-foreground" },
 };
 const FALLBACK_GLYPH = { icon: Tag, className: "w-5 h-5 text-muted-foreground" };
 
@@ -114,6 +121,7 @@ export default function TasksClient({
   const [categories, setCategories] = useState<Category[]>([]);
   const [goals, setGoals] = useState<FilterGoal[]>([]);
   const [milestones, setMilestones] = useState<FilterMilestone[]>([]);
+  const [pillars, setPillars] = useState<OrgPillar[]>([]);
   const [reorderError, setReorderError] = useState<string | null>(null);
 
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -131,6 +139,8 @@ export default function TasksClient({
     // Needed for the history filters: milestones carry the goal linkage.
     getGoals().then(setGoals).catch(console.error);
     getMilestones().then(setMilestones).catch(console.error);
+    // Feeds the edit dialog's function tag. Readable by anyone signed in.
+    getOrgTree().then(setPillars).catch(console.error);
   }, []);
 
   const getUserName = (userId: number) => {
@@ -424,6 +434,7 @@ export default function TasksClient({
         users={users}
         goals={goals}
         milestones={milestones}
+        pillars={pillars}
         inheritedPoints={
           categories.find((c) => c.id === editingTask?.category_id)?.default_points ?? 0
         }

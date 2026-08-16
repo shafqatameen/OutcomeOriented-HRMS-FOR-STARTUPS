@@ -1,16 +1,29 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
+/**
+ * No webfont is loaded. The type stack is Verdana (see `--font-sans` in
+ * globals.css), which every target platform already has, so the app renders
+ * its final typeface on the first paint with no swap and no network round
+ * trip for the font.
+ */
 
 export const metadata: Metadata = {
-  title: "Gamified Point System",
-  description: "Leaderboard & Tasks",
+  title: {
+    default: "OutcomeOriented",
+    template: "%s · OutcomeOriented",
+  },
+  description:
+    "Task board, point ledger and goal tracking for a small team. Completed work earns points that drive the leaderboard.",
+  applicationName: "OutcomeOriented",
+  openGraph: {
+    title: "OutcomeOriented",
+    description:
+      "Task board, point ledger and goal tracking for a small team. Completed work earns points that drive the leaderboard.",
+    type: "website",
+  },
+  // The app sits behind a login; there is nothing here for a crawler.
+  robots: { index: false, follow: false },
 };
 
 /**
@@ -28,7 +41,7 @@ export default function RootLayout({
           (ColorZilla's cz-shortcut-listen, Grammarly's data-gr-*), which React
           reports as a mismatch. Suppression covers only this element's own
           attributes, not the tree below it. */}
-      <body className={inter.className} suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

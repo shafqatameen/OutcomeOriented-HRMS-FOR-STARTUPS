@@ -104,7 +104,7 @@ export default function AccessForm() {
               )}
               <span className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
                 {savedAt[row.user_id] && !dirty && (
-                  <span className="flex items-center gap-1 text-green-600">
+                  <span className="flex items-center gap-1 text-success">
                     <Check className="h-3 w-3" /> Saved
                   </span>
                 )}

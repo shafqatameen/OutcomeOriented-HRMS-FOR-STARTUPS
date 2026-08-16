@@ -1,9 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getCategories, getUsers, createTask, getGoals } from "@/lib/api";
+import { getCategories, getUsers, createTask, getGoals, getOrgTree } from "@/lib/api";
+import type { OrgPillar } from "@/lib/panel";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { PlusCircle } from "lucide-react";
 
 export default function AdminForm() {
@@ -16,11 +18,14 @@ export default function AdminForm() {
   const [points, setPoints] = useState("");
   const [goals, setGoals] = useState<any[]>([]);
   const [milestoneId, setMilestoneId] = useState("");
+  const [tree, setTree] = useState<OrgPillar[]>([]);
+  const [functionId, setFunctionId] = useState("");
 
   useEffect(() => {
     getUsers().then(setUsers).catch(console.error);
     getCategories().then(setCategories).catch(console.error);
     getGoals().then(setGoals).catch(console.error);
+    getOrgTree().then(setTree).catch(console.error);
   }, []);
 
   const handleAssignTask = async (e: React.FormEvent) => {
@@ -34,6 +39,7 @@ export default function AdminForm() {
         title,
         user_id: id,
         category_id: parseInt(categoryId),
+        function_id: functionId ? parseInt(functionId) : undefined,
         is_recurring: isRecurring,
         points: points ? parseInt(points) : undefined,
         milestone_id: milestoneId ? parseInt(milestoneId) : undefined
@@ -58,7 +64,9 @@ export default function AdminForm() {
             <label className="block text-sm font-medium mb-1">Task Title</label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} required />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Four fields now that a task carries both axes, so the row splits
+              two-up before it goes four-up rather than orphaning one control. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">Assign To</label>
               <div className="flex flex-wrap gap-4">
@@ -81,21 +89,45 @@ export default function AdminForm() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Category</label>
-              <select
-                className="w-full border rounded p-2 bg-white dark:bg-slate-900"
+              <label className="block text-sm font-medium mb-1">Track</label>
+              <Select
+                className="w-full"
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
                 required
               >
-                <option value="">Select Category</option>
+                <option value="">Select Track</option>
                 {categories.map(c => <option key={c.id} value={c.id}>{c.name} ({c.default_points}p)</option>)}
-              </select>
+              </Select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                What this does for you, and what it is worth.
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Function (Optional)</label>
+              <Select
+                className="w-full"
+                value={functionId}
+                onChange={(e) => setFunctionId(e.target.value)}
+              >
+                <option value="">Untagged</option>
+                {tree.map(pillar => (
+                  <optgroup key={pillar.id} label={pillar.name}>
+                    {pillar.functions.map(fn => (
+                      <option key={fn.id} value={fn.id}>{fn.name}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </Select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                What kind of work it is. Untagged still scores — it just lands in
+                the panel&apos;s Unassigned bucket.
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Milestone (Optional)</label>
-              <select
-                className="w-full border rounded p-2 bg-white dark:bg-slate-900"
+              <Select
+                className="w-full"
                 value={milestoneId}
                 onChange={(e) => setMilestoneId(e.target.value)}
               >
@@ -107,7 +139,7 @@ export default function AdminForm() {
                     ))}
                   </optgroup>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
           <div>

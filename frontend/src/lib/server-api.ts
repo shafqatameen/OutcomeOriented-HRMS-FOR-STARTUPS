@@ -37,3 +37,29 @@ export async function getCategoriesServer(): Promise<CategorySummary[]> {
 export async function getGoalsServer(): Promise<GoalSummary[]> {
   return (await serverFetch<GoalSummary[]>("/goals")) ?? [];
 }
+
+export type PillarSummary = { id: number; name: string; slug: string };
+
+/**
+ * The pillars alone, without their functions — enough for the rail's sub-items
+ * and for a sub-page to resolve its own heading before first paint. The nested
+ * tree is a client-side read on the page that actually needs the functions.
+ */
+export async function getPillarsServer(): Promise<PillarSummary[]> {
+  return (await serverFetch<PillarSummary[]>("/org/pillars")) ?? [];
+}
+
+/**
+ * How many captures are still unclarified, for the rail's badge.
+ *
+ * The count and not the items: this runs in the shell layout on every page, and
+ * an inbox is the most unguarded thing anybody puts in this app — there is no
+ * reason for its text to be fetched by a route that never displays it.
+ *
+ * Zero on failure, which reads as "nothing waiting". That is the right way to be
+ * wrong: an absent badge is quieter than a badge showing a number nobody can
+ * explain, and the Inbox page itself surfaces the real error.
+ */
+export async function getInboxCountServer(): Promise<number> {
+  return (await serverFetch<{ count: number }>("/inbox/count"))?.count ?? 0;
+}

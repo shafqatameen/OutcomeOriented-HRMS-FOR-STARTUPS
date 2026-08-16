@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { Select } from "@/components/ui/select";
 import { PlusCircle, Pencil, Check, X, Trash2 } from "lucide-react";
 
 type Milestone = {
@@ -254,8 +255,8 @@ export default function GoalsAdminForm() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Goal</label>
-              <select
-                className="w-full border rounded p-2 bg-white dark:bg-slate-900"
+              <Select
+                className="w-full"
                 value={selectedGoalId}
                 onChange={(e) => setSelectedGoalId(e.target.value)}
               >
@@ -265,7 +266,7 @@ export default function GoalsAdminForm() {
                     {g.title}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <Button type="submit" className="flex gap-2">
               <PlusCircle className="w-4 h-4" />
@@ -281,7 +282,7 @@ export default function GoalsAdminForm() {
         </CardHeader>
         <CardContent className="space-y-4">
           {goals.length === 0 ? (
-            <div className="text-center text-sm text-slate-500 p-4">No goals yet.</div>
+            <div className="text-center text-sm text-muted-foreground p-4">No goals yet.</div>
           ) : (
             goals.map((goal) => (
               <div key={goal.id} className="space-y-2">
@@ -331,7 +332,7 @@ export default function GoalsAdminForm() {
                     </>
                   )}
                 </div>
-                <div className="space-y-2 pl-3 border-l-2 border-slate-200 dark:border-slate-800">
+                <div className="space-y-2 pl-3 border-l-2 border-border">
                   {goal.milestones.map((milestone) => (
                     <div
                       key={milestone.id}
@@ -358,7 +359,7 @@ export default function GoalsAdminForm() {
                           <span className="font-medium">{milestone.title}</span>
                           <div className="flex items-center gap-2">
                             {milestone.progress_pct === 100 ? (
-                              <Badge variant="outline" className="text-green-600 bg-green-50">
+                              <Badge variant="success">
                                 Completed
                               </Badge>
                             ) : (

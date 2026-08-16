@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { downloadExport, getExportManifest } from "@/lib/api";
 import { saveBlob } from "@/lib/download";
 import { RANGE_PRESETS, rangeLabel, resolveRange, type RangePreset } from "@/lib/date-range";
+import { Select, selectClassName } from "@/components/ui/select";
 
 type SheetInfo = {
   key: string;
@@ -148,7 +149,7 @@ export default function ExportClient() {
       )}
 
       {savedName && (
-        <div className="flex items-center gap-2 rounded border border-green-600/40 p-3 text-sm text-green-700 dark:text-green-500">
+        <div className="flex items-center gap-2 rounded border border-success/40 p-3 text-sm text-success">
           <Check className="h-4 w-4" />
           Downloaded {savedName}
         </div>
@@ -162,21 +163,20 @@ export default function ExportClient() {
               <div className="flex items-center gap-2">
                 <input
                   type="date"
-                  className="border rounded p-2 text-sm bg-white dark:bg-slate-900"
+                  className={selectClassName}
                   value={customStart}
                   onChange={(e) => setCustomStart(e.target.value)}
                 />
-                <span className="text-sm text-slate-500">to</span>
+                <span className="text-sm text-muted-foreground">to</span>
                 <input
                   type="date"
-                  className="border rounded p-2 text-sm bg-white dark:bg-slate-900"
+                  className={selectClassName}
                   value={customEnd}
                   onChange={(e) => setCustomEnd(e.target.value)}
                 />
               </div>
             )}
-            <select
-              className="border rounded p-2 text-sm bg-white dark:bg-slate-900"
+            <Select
               value={preset}
               onChange={(e) => setPreset(e.target.value as RangePreset)}
             >
@@ -185,7 +185,7 @@ export default function ExportClient() {
                   {option.label}
                 </option>
               ))}
-            </select>
+            </Select>
             <div className="flex items-center gap-1">
               <Button
                 size="sm"

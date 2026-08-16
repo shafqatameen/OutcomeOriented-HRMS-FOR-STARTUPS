@@ -19,6 +19,11 @@ from app.core.database import SQLALCHEMY_DATABASE_URL
 from app.modules.users import models as users_models  # noqa: F401
 from app.modules.tasks import models as tasks_models  # noqa: F401
 from app.modules.goals import models as goals_models  # noqa: F401
+from app.modules.org import models as org_models  # noqa: F401
+from app.modules.inbox import models as inbox_models  # noqa: F401
+from app.modules.buckets import models as bucket_models  # noqa: F401
+from app.modules.boards import models as board_models  # noqa: F401
+from app.modules.calendar_sync import models as calendar_models  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

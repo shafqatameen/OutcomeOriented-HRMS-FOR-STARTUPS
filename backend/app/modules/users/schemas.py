@@ -7,13 +7,21 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+    #: The address this person signs in with. Optional only so that scripted
+    #: callers predating email sign-in keep working; the admin form requires it.
+    email: Optional[str] = None
 
 class User(UserBase):
     id: int
     total_points: int
+    #: Null on accounts that predate email sign-in. Those still sign in by name
+    #: until an address is set - the admin list flags them for exactly that.
+    email: Optional[str] = None
     #: False means sign-in is blocked. Everything else about the account -
     #: its tasks, its points, its place on the leaderboard - is unaffected.
     is_active: bool
+    #: The function this person is meant to be working in. None is normal.
+    home_function_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -22,6 +30,11 @@ class User(UserBase):
 class UserActiveUpdate(BaseModel):
     """Deactivates the account when false, restores it when true."""
     is_active: bool
+
+
+class SeatUpdate(BaseModel):
+    """Sets the fixed place. An explicit null clears it."""
+    home_function_id: Optional[int] = None
 
 
 class UserUpdate(BaseModel):
@@ -33,6 +46,10 @@ class UserUpdate(BaseModel):
     """
     name: Optional[str] = None
     password: Optional[str] = None
+    #: Setting this is what moves an account onto email sign-in. There is no way
+    #: to clear it back to null: that would silently hand the account back to the
+    #: legacy name fallback, which is a downgrade nobody would mean to request.
+    email: Optional[str] = None
 
 
 class PermissionInfo(BaseModel):

@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { TaskUpdate } from "@/lib/api";
+import { Select, selectClassName } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 
 export type EditableTask = {
@@ -19,6 +20,7 @@ export type EditableTask = {
   title: string;
   user_id: number;
   milestone_id: number | null;
+  function_id: number | null;
   is_recurring: boolean;
   points: number | null;
 };
@@ -26,6 +28,11 @@ export type EditableTask = {
 type EditUser = { id: number; name: string; is_active?: boolean };
 type EditGoal = { id: number; title: string };
 type EditMilestone = { id: number; title: string; goal_id: number };
+type EditPillar = {
+  id: number;
+  name: string;
+  functions: { id: number; name: string }[];
+};
 
 type TaskEditDialogProps = {
   /**
@@ -37,6 +44,8 @@ type TaskEditDialogProps = {
   users: EditUser[];
   goals: EditGoal[];
   milestones: EditMilestone[];
+  /** Pillars with their functions, for the domain tag. Empty hides the field. */
+  pillars?: EditPillar[];
   /** The category default, shown as the points placeholder so blank means something. */
   inheritedPoints: number;
   onClose: () => void;
@@ -48,6 +57,7 @@ type Form = {
   title: string;
   userId: string;
   milestoneId: string;
+  functionId: string;
   /** Blank means "inherit the category default" — not zero. */
   points: string;
   isRecurring: boolean;
@@ -57,11 +67,12 @@ const formFor = (task: EditableTask): Form => ({
   title: task.title,
   userId: String(task.user_id),
   milestoneId: task.milestone_id === null ? "" : String(task.milestone_id),
+  functionId: task.function_id === null ? "" : String(task.function_id),
   points: task.points === null ? "" : String(task.points),
   isRecurring: task.is_recurring,
 });
 
-const selectClass = "w-full border rounded p-2 text-sm bg-white dark:bg-slate-900";
+const selectClass = `${selectClassName} w-full`;
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -85,6 +96,7 @@ export default function TaskEditDialog({
   users,
   goals,
   milestones,
+  pillars = [],
   inheritedPoints,
   onClose,
   onSave,
@@ -129,12 +141,14 @@ export default function TaskEditDialog({
     }
 
     const milestoneId = form.milestoneId === "" ? null : Number(form.milestoneId);
+    const functionId = form.functionId === "" ? null : Number(form.functionId);
     const userId = Number(form.userId);
 
     const patch: TaskUpdate = {};
     if (title !== task.title) patch.title = title;
     if (userId !== task.user_id) patch.user_id = userId;
     if (milestoneId !== task.milestone_id) patch.milestone_id = milestoneId;
+    if (functionId !== task.function_id) patch.function_id = functionId;
     if (points !== task.points) patch.points = points;
     if (form.isRecurring !== task.is_recurring) patch.is_recurring = form.isRecurring;
 
@@ -181,7 +195,7 @@ export default function TaskEditDialog({
           </Field>
 
           <Field label="Assigned to">
-            <select
+            <Select
               className={selectClass}
               value={form.userId}
               onChange={(e) => set("userId", e.target.value)}
@@ -192,11 +206,11 @@ export default function TaskEditDialog({
                   {u.is_active === false ? " (deactivated)" : ""}
                 </option>
               ))}
-            </select>
+            </Select>
           </Field>
 
           <Field label="Milestone">
-            <select
+            <Select
               className={selectClass}
               value={form.milestoneId}
               onChange={(e) => set("milestoneId", e.target.value)}
@@ -211,8 +225,32 @@ export default function TaskEditDialog({
                   ))}
                 </optgroup>
               ))}
-            </select>
+            </Select>
           </Field>
+
+          {/* Retagging is allowed on a completed task, unlike reassigning or
+              repricing: the ledger stores no function of its own, so this moves
+              the points with it rather than stranding them. */}
+          {pillars.length > 0 && (
+            <Field label="Function">
+              <Select
+                className={selectClass}
+                value={form.functionId}
+                onChange={(e) => set("functionId", e.target.value)}
+              >
+                <option value="">Untagged</option>
+                {pillars.map((pillar) => (
+                  <optgroup key={pillar.id} label={pillar.name}>
+                    {pillar.functions.map((fn) => (
+                      <option key={fn.id} value={fn.id}>
+                        {fn.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </Select>
+            </Field>
+          )}
 
           <Field label="Points">
             <Input

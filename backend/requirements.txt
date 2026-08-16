@@ -7,3 +7,7 @@ bcrypt==5.0.0
 PyJWT==2.13.0
 alembic==1.18.5
 openpyxl==3.1.5
+# Encrypts the Google OAuth tokens in google_accounts. See app/core/tokenstore.py
+# for why those columns are ciphertext rather than plaintext. Nothing else in
+# this backend needs a cipher, which is why it arrives this late.
+cryptography==50.0.0
