@@ -27,6 +27,25 @@ class User(UserBase):
         from_attributes = True
 
 
+class PendingUser(BaseModel):
+    """One account waiting for approval, for the admin queue.
+
+    Deliberately not the full `User`: nothing here has points, a seat or
+    permissions yet, and showing those columns as zeroes invites an
+    administrator to read them as facts about a person rather than as the
+    absence of an account.
+    """
+    id: int
+    name: str
+    #: Always present in this queue - an account with no address cannot have
+    #: verified one, and only verified accounts are listed.
+    email: Optional[str] = None
+    role: str
+
+    class Config:
+        from_attributes = True
+
+
 class UserActiveUpdate(BaseModel):
     """Deactivates the account when false, restores it when true."""
     is_active: bool

@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.core.base import Base
 from app.core.database import SQLALCHEMY_DATABASE_URL
 from app.modules.users import models as users_models  # noqa: F401
+from app.modules.auth import models as auth_models  # noqa: F401
 from app.modules.tasks import models as tasks_models  # noqa: F401
 from app.modules.goals import models as goals_models  # noqa: F401
 from app.modules.org import models as org_models  # noqa: F401

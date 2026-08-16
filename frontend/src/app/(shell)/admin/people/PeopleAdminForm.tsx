@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { PendingApprovals } from "./PendingApprovals";
 import { Select } from "@/components/ui/select";
 import { PlusCircle, Trash2, UserMinus, UserCheck, Pencil, Check, X, Eye, EyeOff } from "lucide-react";
 
@@ -227,6 +228,10 @@ export default function PeopleAdminForm({ currentUserId }: { currentUserId: numb
           {error}
         </div>
       )}
+
+      {/* Above Add Person deliberately: somebody already waiting should be dealt
+          with before a second account is created for them by hand. */}
+      <PendingApprovals onApproved={reloadAll} />
 
       <Card>
         <CardHeader>

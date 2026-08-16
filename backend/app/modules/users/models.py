@@ -1,4 +1,12 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship
 from app.core.base import Base
 
@@ -31,6 +39,33 @@ class User(Base):
     #: restriction - work logged outside the seat still counts fully, it just
     #: shows up on the panel as drift, which is the number worth looking at.
     home_function_id = Column(Integer, ForeignKey("functions.id"), nullable=True, index=True)
+
+    #: When this address was proven to belong to whoever is using it - by
+    #: following a mailed link, or by Google having already proven it.
+    #:
+    #: Null means unproven, which is a different thing from unapproved below.
+    #: Accounts an administrator created by hand are stamped by migration
+    #: d8f1a3c95b27: an admin typing an address *is* the proof, and making
+    #: existing colleagues re-verify would have been a flag day for no gain.
+    email_verified_at = Column(DateTime, nullable=True)
+
+    #: When an administrator let this account in. Null means it is sitting in
+    #: the pending queue.
+    #:
+    #: Separate from is_active on purpose, even though a pending account is also
+    #: inactive. Collapsing the two would leave login unable to tell "we have
+    #: never let you in" from "you were let in and then removed", and those need
+    #: different sentences - one says wait, the other says ask.
+    approved_at = Column(DateTime, nullable=True)
+
+    #: Google's stable subject id for this person, once they have signed in with
+    #: Google. Null for password-only accounts.
+    #:
+    #: Matched on in preference to the email address, because the two are not
+    #: equally durable: a Workspace address can be released and handed to a new
+    #: employee, and matching on it would silently give that new person the old
+    #: one's account. `sub` is never reissued.
+    google_sub = Column(String, unique=True, index=True, nullable=True)
 
     tasks = relationship("app.modules.tasks.models.Task", back_populates="user")
     home_function = relationship(

@@ -1,4 +1,5 @@
 import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.migrations import run_migrations
@@ -8,6 +9,8 @@ from app.modules.tasks.router import router as tasks_router
 from app.modules.goals.router import router as goals_router
 from app.modules.leaderboard.router import router as leaderboard_router
 from app.modules.auth.router import router as auth_router
+from app.modules.auth.registration import router as registration_router
+from app.modules.auth.google_login import router as google_login_router
 from app.modules.export.router import router as export_router
 from app.modules.org.router import router as org_router
 from app.modules.panel.router import router as panel_router
@@ -41,6 +44,8 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(registration_router)
+app.include_router(google_login_router)
 app.include_router(users_router)
 app.include_router(tasks_router)
 app.include_router(goals_router)

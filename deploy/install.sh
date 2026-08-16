@@ -124,6 +124,7 @@ else
   # matches this string exactly, so a stale domain here fails every connection
   # with redirect_uri_mismatch long after the rest of the app has moved on.
   sed -i "s|^GOOGLE_REDIRECT_URI=.*|GOOGLE_REDIRECT_URI=https://$DOMAIN/api/integrations/google/callback|" "$ENV_DIR/backend.env"
+  sed -i "s|^GOOGLE_LOGIN_REDIRECT_URI=.*|GOOGLE_LOGIN_REDIRECT_URI=https://$DOMAIN/api/auth/google/callback|" "$ENV_DIR/backend.env"
 fi
 
 # Google Calendar, on the same footing as the mail keys below: the redirect URI
@@ -161,6 +162,24 @@ MAIL_FROM=
 MAIL_FROM_NAME=OutcomeOriented
 MAIL_TIMEOUT=15
 EOF
+fi
+
+# The sign-in callback is a second, separate Authorised redirect URI on the same
+# OAuth client as the calendar one. Both must be registered; Google matches the
+# redirect against the flow the code was issued for, so one cannot cover both.
+if ! grep -q '^GOOGLE_LOGIN_REDIRECT_URI=' "$ENV_DIR/backend.env"; then
+  log "Adding Google sign-in redirect to $ENV_DIR/backend.env"
+  cat >>"$ENV_DIR/backend.env" <<EOF
+GOOGLE_LOGIN_REDIRECT_URI=https://$DOMAIN/api/auth/google/callback
+EOF
+fi
+
+# Self-service sign-up. On by default, and narrower than it sounds: a
+# self-registered account confirms its address, sets a password, then sits
+# inactive with no permissions until an administrator approves it.
+if ! grep -q '^PUBLIC_SIGNUP_ENABLED=' "$ENV_DIR/backend.env"; then
+  log "Adding PUBLIC_SIGNUP_ENABLED to $ENV_DIR/backend.env"
+  echo 'PUBLIC_SIGNUP_ENABLED=true' >>"$ENV_DIR/backend.env"
 fi
 
 chown root:"$APP_USER" "$ENV_DIR/backend.env"

@@ -67,8 +67,33 @@ def login(payload: schemas.LoginRequest, response: Response, db: Session = Depen
     if not user or not user.password_hash or not password_ok:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    # Deliberately checked after the password: answering "deactivated" to a wrong
-    # guess would turn this endpoint into a way to enumerate accounts.
+    # Everything below is checked *after* the password, and only ever reached by
+    # somebody who has already proved they own the account. Answering any of it
+    # to a wrong guess would turn this endpoint into a way to enumerate accounts
+    # and read off their state.
+    #
+    # The order matters: an account can be unverified, unapproved and inactive
+    # all at once, and the first of those is the one they can actually do
+    # something about.
+
+    if user.email and user.email_verified_at is None:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Confirm your email address first - check your inbox for the link "
+                "we sent, or ask for a new one."
+            ),
+        )
+
+    if user.approved_at is None:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Your account is waiting for an administrator to approve it. "
+                "You will get an email when it is ready."
+            ),
+        )
+
     if not user.is_active:
         raise HTTPException(
             status_code=403,

@@ -237,15 +237,21 @@ def authorization_url(state: str) -> str:
     return f"{AUTH_ENDPOINT}?{urllib.parse.urlencode(query)}"
 
 
-def exchange_code(code: str) -> Dict[str, Any]:
-    """Turns the one-time code from the callback into tokens."""
+def exchange_code(code: str, callback_uri: Optional[str] = None) -> Dict[str, Any]:
+    """Turns the one-time code from the callback into tokens.
+
+    `callback_uri` overrides this module's own redirect for callers running a
+    different flow through the same OAuth client - sign-in (auth/google_login.py)
+    comes back to its own endpoint, and Google requires the value here to match
+    the one the code was issued against exactly.
+    """
     return _form_post(
         TOKEN_ENDPOINT,
         {
             "code": code,
             "client_id": client_id(),
             "client_secret": client_secret(),
-            "redirect_uri": redirect_uri(),
+            "redirect_uri": callback_uri or redirect_uri(),
             "grant_type": "authorization_code",
         },
     )

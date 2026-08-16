@@ -1,11 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from app.core.database import get_db
 from app.core.emails import InvalidEmail, normalise_email
 from app.core.integrity import Blocker, deletion_blocked
+from app.core.mail import MailError
+from app.modules.auth import notifications
 from app.modules.users import models, schemas
 from app.modules.tasks import models as task_models
+from app.modules.tasks.models import get_ist_now
 from app.modules.org import models as org_models
 from app.modules.auth.dependencies import granted_keys, require_permission, require_user
 from app.modules.auth.permissions import (
@@ -54,11 +57,21 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db), _admin=
 
     email = _resolve_email(db, user.email) if user.email is not None else None
 
+    now = get_ist_now()
     db_user = models.User(
         name=user.name,
         role=user.role,
         email=email,
         password_hash=hash_password(user.password),
+        # An account made here is approved by the act of making it - the person
+        # doing it is the same person who would otherwise approve it, and leaving
+        # these null would drop every admin-created colleague into the pending
+        # queue behind the administrator who just created them.
+        approved_at=now,
+        # Likewise verified: an administrator typing a colleague's address is
+        # the proof. There is no mailed link for this path, so waiting for one
+        # would mean waiting forever.
+        email_verified_at=now if email else None,
     )
     db.add(db_user)
     db.flush()
@@ -185,6 +198,91 @@ def set_user_active(
     user.is_active = update.is_active
     db.commit()
     db.refresh(user)
+    return user
+
+
+@router.get("/pending", response_model=List[schemas.PendingUser])
+def read_pending(db: Session = Depends(get_db), _admin=Depends(require_permission("admin.users"))):
+    """Accounts that have confirmed an address and are waiting to be let in.
+
+    Unverified sign-ups are excluded. Somebody who typed an address and never
+    followed the link has proved nothing, and listing them would fill this queue
+    with typos and with addresses their owners never asked to register - which
+    is also how the queue becomes a place an administrator stops looking.
+    """
+    return (
+        db.query(models.User)
+        .filter(models.User.approved_at.is_(None))
+        .filter(models.User.email_verified_at.isnot(None))
+        .order_by(models.User.id)
+        .all()
+    )
+
+
+@router.post("/{user_id}/approve", response_model=schemas.User)
+def approve_user(
+    user_id: int,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+    _admin=Depends(require_permission("admin.users")),
+):
+    """Lets a pending account in, with the same starting access as any new hire.
+
+    Idempotent: approving an already-approved account changes nothing and does
+    not re-send the mail. Two administrators clicking the same row is an obvious
+    way to reach this, and it should not produce a duplicate welcome or reset
+    somebody's permissions back to the defaults.
+    """
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.approved_at is not None:
+        return user
+
+    if user.email_verified_at is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "This person has not confirmed their email address yet. "
+                "There is nothing to approve until they do."
+            ),
+        )
+
+    user.approved_at = get_ist_now()
+    user.is_active = True
+
+    # The same defaults create_user grants, and granted here rather than at
+    # sign-up so that a pending account carries no permissions at all while it
+    # waits. Existing rows are left alone, which is what keeps re-approving a
+    # restored account from wiping access somebody deliberately widened.
+    already = {
+        row[0]
+        for row in db.query(models.UserPermission.permission_key)
+        .filter(models.UserPermission.user_id == user.id)
+        .all()
+    }
+    for key in DEFAULT_NEW_USER_PERMISSIONS:
+        if key not in already:
+            db.add(models.UserPermission(user_id=user.id, permission_key=key))
+
+    db.commit()
+    db.refresh(user)
+
+    if user.email:
+        address, name = user.email, user.name
+
+        def notify():
+            try:
+                notifications.send_approved(address, name)
+            except MailError as exc:
+                # Logged, not raised: the approval has already been committed,
+                # and failing the request would invite the administrator to
+                # click again on an account that is in fact already approved.
+                print(f"[mail:failed] approval notice -> {address}: {exc}")
+
+        background.add_task(notify)
+
     return user
 
 

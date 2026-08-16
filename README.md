@@ -371,12 +371,44 @@ database or bringing an existing one up to head.
 | Variable | Default | Purpose |
 |---|---|---|
 | `JWT_SECRET_KEY` | insecure dev default | Signs session JWTs, and derives the key encrypting stored Google tokens. Set before any deployment; rotating it also drops every calendar connection. |
-| `FRONTEND_ORIGIN` | `http://localhost:3000` | Allowed CORS origin, and where the Google callback returns to |
+| `FRONTEND_ORIGIN` | `http://localhost:3000` | Allowed CORS origin, where the Google callback returns to, and the host every emailed link points at |
 | `COOKIE_SECURE` | `false` | Adds `Secure` to the session cookie; must stay false on local http |
+| `PUBLIC_SIGNUP_ENABLED` | `true` | Whether `/signup` accepts strangers. They still land in the approval queue. |
 | `SEED_PASSWORD_*` | random | Optional fixed passwords for `seed.py` |
-| `GOOGLE_CLIENT_ID` | unset | OAuth client for the calendar sync. Blank disables the feature cleanly. |
+| `MAIL_HOST` | unset | SMTP server. Blank prints every message to the log instead of sending, which is the intended local default. |
+| `MAIL_PORT` | `587` | 587 is STARTTLS, 465 is implicit TLS |
+| `MAIL_USERNAME` / `MAIL_PASSWORD` | unset | Mailbox login |
+| `MAIL_FROM` | `MAIL_USERNAME` | Most providers reject a sender that is not the authenticated mailbox |
+| `MAIL_SECURITY` | derived from port | `ssl`, `starttls` or `none` |
+| `GOOGLE_CLIENT_ID` | unset | OAuth client, shared by calendar sync and Google sign-in. Blank disables both cleanly. |
 | `GOOGLE_CLIENT_SECRET` | unset | Its secret |
-| `GOOGLE_REDIRECT_URI` | `http://localhost:8000/integrations/google/callback` | Must match the Authorised redirect URI on the OAuth client character for character |
+| `GOOGLE_REDIRECT_URI` | `http://localhost:8000/integrations/google/callback` | Calendar callback. Must match the Authorised redirect URI on the OAuth client character for character |
+| `GOOGLE_LOGIN_REDIRECT_URI` | `http://localhost:8000/auth/google/callback` | Sign-in callback. A *second* Authorised redirect URI on the same client. |
+
+`backend/.env` is read automatically at import (`app/core/config.py`), so the
+plain `uvicorn app.main:app` above picks it up. Real environment variables always
+win, which is what lets the deployment keep injecting settings through systemd's
+`EnvironmentFile` without a stale `.env` in the release overriding them.
+
+#### Accounts
+
+Three ways in, one approval gate:
+
+1. **An administrator creates one** on the People page. Approved and verified by
+   the act of creating it — nothing is emailed and nothing waits.
+2. **Someone signs themselves up** at `/signup`. They give an address, confirm it
+   through a mailed link, then choose a password. The account is inactive and
+   holds no permission keys until an administrator approves it.
+3. **Someone uses Continue with Google.** Google has already proved the address,
+   so there is no confirmation link — but approval is still required.
+
+Password reset is at `/forgot-password` for all three. Verification links last
+24 hours, reset links one hour, and every link is single-use.
+
+`/auth/signup`, `/auth/forgot-password` and `/auth/resend-verification` answer
+identically whether or not the address is registered. That is load-bearing, not
+politeness: a different answer for a known address turns the sign-up form into a
+staff directory anyone can query. Do not "improve" the messages.
 
 ### Frontend
 

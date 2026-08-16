@@ -327,6 +327,69 @@ export const login = (email: string, password: string) =>
   fetchAPI("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
 export const logout = () => fetchAPI("/auth/logout", { method: "POST" });
 export const getMe = () => fetchAPI("/auth/me");
+
+/* --- Self-service accounts ---------------------------------------------------
+ *
+ * Every one of these is callable without a session, and the three that send
+ * mail deliberately answer the same way whether or not the address is
+ * registered. Do not "improve" that by surfacing a different message for a
+ * known address — it would turn the sign-up form into a staff directory.
+ */
+
+/** What the sign-up page may offer. Both flags come from the server's config. */
+export type SignupStatus = { enabled: boolean; mail_ready: boolean };
+export const getSignupStatus = (): Promise<SignupStatus> => fetchAPI("/auth/signup-status");
+
+/** Starts an account. No password here — that is chosen after the link is followed. */
+export const signup = (email: string, name?: string) =>
+  fetchAPI("/auth/signup", { method: "POST", body: JSON.stringify({ email, name }) });
+
+export const resendVerification = (email: string) =>
+  fetchAPI("/auth/resend-verification", { method: "POST", body: JSON.stringify({ email }) });
+
+export const forgotPassword = (email: string) =>
+  fetchAPI("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) });
+
+export type TokenPurpose = "verify_email" | "password_reset";
+
+/** Masked address, so the page can say which account a link belongs to. */
+export type TokenCheck = { valid: boolean; email: string | null; name: string | null };
+
+/** Asks whether a link is still good without spending it. */
+export const checkToken = (token: string, purpose: TokenPurpose): Promise<TokenCheck> =>
+  fetchAPI("/auth/token/check", { method: "POST", body: JSON.stringify({ token, purpose }) });
+
+/**
+ * `signed_in` means a session cookie arrived with the response and the browser
+ * can go straight to the app. The others each need their own sentence.
+ */
+export type SetPasswordResult = {
+  status: "pending" | "ready" | "signed_in" | "deactivated";
+  message: string;
+};
+
+/** Confirms the address and sets the first password. */
+export const verifyEmail = (token: string, password: string, passwordConfirm: string): Promise<SetPasswordResult> =>
+  fetchAPI("/auth/verify", {
+    method: "POST",
+    body: JSON.stringify({ token, password, password_confirm: passwordConfirm }),
+  });
+
+export const resetPassword = (token: string, password: string, passwordConfirm: string): Promise<SetPasswordResult> =>
+  fetchAPI("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password, password_confirm: passwordConfirm }),
+  });
+
+export type GoogleStart = { configured: boolean; authorization_url: string | null };
+/** Null `authorization_url` means this server has no Google credentials. */
+export const getGoogleSignInUrl = (): Promise<GoogleStart> => fetchAPI("/auth/google/start");
+
+export type PendingUser = { id: number; name: string; email: string | null; role: string };
+/** Accounts that confirmed an address and are waiting to be let in. */
+export const getPendingUsers = (): Promise<PendingUser[]> => fetchAPI("/users/pending");
+export const approveUser = (userId: number) =>
+  fetchAPI(`/users/${userId}/approve`, { method: "POST" });
 export const getPermissionCatalogue = () => fetchAPI("/users/access/catalogue");
 export const getUserAccess = () => fetchAPI("/users/access");
 /** Replaces one account's grants with exactly this set. */
