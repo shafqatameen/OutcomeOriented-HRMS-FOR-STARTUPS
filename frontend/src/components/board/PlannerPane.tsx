@@ -4,7 +4,11 @@ import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import type { CalendarCard } from "@/lib/api";
 import { formatDayHeading, formatTime, istDay, istMinutes, parseIst } from "@/lib/board";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+
+/** How many days the grid may show at once. */
+export const PLANNER_SPANS = [3, 7] as const;
 
 /** Pixels per hour. Tall enough that a half-hour block still fits its title. */
 const HOUR_HEIGHT = 44;
@@ -76,6 +80,9 @@ type PlannerPaneProps = {
   cards: CalendarCard[] | null;
   onShift: (days: number) => void;
   onToday: () => void;
+  /** Changes how many columns the grid holds — and with it what the board's
+   *  Calendar list shows, which is windowed to exactly these days. */
+  onSpanChange: (days: number) => void;
   onOpenCard: (cardId: number) => void;
   /** Omitted when the board is read-only or has no Calendar list to write into. */
   onCreateAt?: (day: string, hour: number) => void;
@@ -94,6 +101,7 @@ export default function PlannerPane({
   cards,
   onShift,
   onToday,
+  onSpanChange,
   onOpenCard,
   onCreateAt,
   error = null,
@@ -127,7 +135,19 @@ export default function PlannerPane({
         <Button size="icon-sm" variant="ghost" onClick={() => onShift(days.length)} aria-label="Later">
           <ChevronRight className="h-4 w-4" />
         </Button>
-        {error && <span className="ml-2 truncate text-xs text-destructive">{error}</span>}
+        {error && <span className="ml-2 min-w-0 truncate text-xs text-destructive">{error}</span>}
+        <Select
+          value={String(days.length)}
+          onChange={(event) => onSpanChange(Number(event.target.value))}
+          aria-label="Days on the grid"
+          className="ml-auto h-7 shrink-0 py-0 text-xs"
+        >
+          {PLANNER_SPANS.map((span) => (
+            <option key={span} value={span}>
+              {span} days
+            </option>
+          ))}
+        </Select>
       </header>
 
       {/* Day names stay put while the hours scroll, or you lose track of which

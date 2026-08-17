@@ -8,8 +8,11 @@ export default function GateLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="flex min-h-svh items-center justify-center px-4 py-12">
+    // A `main` rather than a plain wrapper: these pages have no rail and so no
+    // skip link, and without a main landmark a screen reader has nothing to jump
+    // to — the whole page reads as one undifferentiated region.
+    <main className="flex min-h-svh items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">{children}</div>
-    </div>
+    </main>
   );
 }

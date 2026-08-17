@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 /**
@@ -9,6 +10,9 @@ import "./globals.css";
  */
 
 export const metadata: Metadata = {
+  // Lets /login declare its canonical and Open Graph URLs relatively; without a
+  // base, Next cannot turn those into the absolute URLs both formats require.
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "OutcomeOriented",
     template: "%s · OutcomeOriented",
@@ -22,7 +26,9 @@ export const metadata: Metadata = {
       "Task board, point ledger and goal tracking for a small team. Completed work earns points that drive the leaderboard.",
     type: "website",
   },
-  // The app sits behind a login; there is nothing here for a crawler.
+  // Default to invisible: the workspace sits behind a login, so there is nothing
+  // in it for a crawler. /login overrides this back to indexable, because it is
+  // also the page that explains what the product is — see that route's metadata.
   robots: { index: false, follow: false },
 };
 

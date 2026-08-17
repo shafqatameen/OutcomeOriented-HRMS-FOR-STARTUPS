@@ -184,6 +184,11 @@ cat >"$APP_DIR/frontend/.env.production" <<EOF
 NEXT_PUBLIC_API_URL=https://$DOMAIN/api
 # Server Components talk to the backend directly, bypassing the proxy.
 INTERNAL_API_URL=http://127.0.0.1:$BACKEND_PORT
+# This site's own origin, for the absolute URLs the metadata layer has to emit:
+# robots.txt, sitemap.xml, and the canonical/Open Graph tags on /login. Both
+# robots and sitemap are prerendered, so this has to be set before the build for
+# the same reason NEXT_PUBLIC_* does.
+SITE_URL=https://$DOMAIN
 EOF
 chown "$APP_USER:$APP_USER" "$APP_DIR/frontend/.env.production"
 

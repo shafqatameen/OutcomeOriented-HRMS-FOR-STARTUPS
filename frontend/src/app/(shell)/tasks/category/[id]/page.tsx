@@ -1,8 +1,20 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { can, requireUser } from "@/lib/session";
 import { getCategoriesServer } from "@/lib/server-api";
 import NoAccess from "@/components/NoAccess";
 import TasksClient from "../../TasksClient";
+
+/** Tab title from the category's name. Reuses the page's own memoized fetch. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const category = (await getCategoriesServer()).find((c) => c.id === Number(id));
+  return category ? { title: category.name } : {};
+}
 
 /**
  * One category's tasks. The name is resolved server-side so the heading is right

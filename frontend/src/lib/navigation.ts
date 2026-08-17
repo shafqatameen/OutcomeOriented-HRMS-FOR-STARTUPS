@@ -66,9 +66,6 @@ export type NavItem = {
   sectionRoutes?: string[];
 };
 
-/** Any row below the top level. Kept as a name because that is what it means. */
-export type SubDestination = NavItem;
-
 /** A top-level row. Only these have a fixed, known id. */
 export type Destination = NavItem & { id: DestinationId };
 

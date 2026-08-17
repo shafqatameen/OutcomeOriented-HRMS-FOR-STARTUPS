@@ -21,6 +21,15 @@ type BoardPaneProps = {
    * would give dnd-kit two draggables sharing one id.
    */
   lists: BoardListView[];
+  /**
+   * A line to print under a column's header, by list id.
+   *
+   * Only the Calendar list uses one today, to say that it is showing the
+   * Planner's days rather than everything it holds. A column whose cards have
+   * been filtered has to admit it — otherwise an empty-looking Calendar reads as
+   * lost cards, and the count in the header reads as a bug.
+   */
+  listNotes?: Record<number, string>;
   onOpenCard: (cardId: number) => void;
   onAddCard: (listId: number, title: string) => Promise<void>;
   onRenameList: (listId: number, name: string) => Promise<void>;
@@ -40,6 +49,7 @@ type BoardPaneProps = {
 export default function BoardPane({
   board,
   lists,
+  listNotes,
   onOpenCard,
   onAddCard,
   onRenameList,
@@ -57,6 +67,7 @@ export default function BoardPane({
           <ListColumn
             key={list.id}
             list={list}
+            note={listNotes?.[list.id]}
             writable={writable}
             administrable={administrable}
             onOpenCard={onOpenCard}
@@ -74,6 +85,7 @@ export default function BoardPane({
 
 function ListColumn({
   list,
+  note,
   writable,
   administrable,
   onOpenCard,
@@ -83,6 +95,7 @@ function ListColumn({
   onDeleteList,
 }: {
   list: BoardListView;
+  note?: string;
   writable: boolean;
   administrable: boolean;
 } & Pick<BoardPaneProps, "onOpenCard" | "onAddCard" | "onRenameList" | "onArchiveList" | "onDeleteList">) {
@@ -214,6 +227,8 @@ function ListColumn({
           </details>
         )}
       </header>
+
+      {note && <p className="px-2 pb-1 text-[10px] leading-tight text-muted-foreground">{note}</p>}
 
       <div
         ref={setZoneRef}

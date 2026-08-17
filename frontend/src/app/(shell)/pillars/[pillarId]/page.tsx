@@ -1,8 +1,20 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { can, requireUser } from "@/lib/session";
 import { getPillarsServer } from "@/lib/server-api";
 import NoAccess from "@/components/NoAccess";
 import PillarsClient from "../PillarsClient";
+
+/** Tab title from the pillar's name. Reuses the page's own memoized fetch. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ pillarId: string }>;
+}): Promise<Metadata> {
+  const { pillarId } = await params;
+  const pillar = (await getPillarsServer()).find((row) => row.id === Number(pillarId));
+  return pillar ? { title: pillar.name } : {};
+}
 
 /**
  * One pillar's functions. The name is resolved server-side so the heading is

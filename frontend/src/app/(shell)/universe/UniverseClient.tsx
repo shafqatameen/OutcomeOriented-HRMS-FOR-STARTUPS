@@ -57,6 +57,7 @@ import {
   parseIst,
   removeCardLocal,
   replaceCardLocal,
+  withinDays,
 } from "@/lib/board";
 import BoardPane from "@/components/board/BoardPane";
 import CapturePane from "@/components/board/CapturePane";
@@ -80,8 +81,8 @@ import {
 } from "@/components/ui/dialog";
 import { Select } from "@/components/ui/select";
 
-/** How many days the Planner shows at once. Three, as on the reference board. */
-const PLANNER_DAYS = 3;
+/** How many days the Planner opens on. Three, as on the reference board. */
+const DEFAULT_PLANNER_DAYS = 3;
 
 /**
  * How stale a Google sync may be before opening the board runs one.
@@ -159,6 +160,7 @@ export default function UniverseClient({
   const showsPlanner = layout.isMounted("planner");
 
   const [firstDay, setFirstDay] = useState(() => istDay(new Date()));
+  const [plannerDays, setPlannerDays] = useState(DEFAULT_PLANNER_DAYS);
   const [calendar, setCalendar] = useState<CalendarCard[] | null>(null);
   const [calendarError, setCalendarError] = useState<string | null>(null);
 
@@ -186,12 +188,12 @@ export default function UniverseClient({
 
   const days = useMemo(() => {
     const start = new Date(`${firstDay}T12:00:00+05:30`);
-    return Array.from({ length: PLANNER_DAYS }, (_, offset) => {
+    return Array.from({ length: plannerDays }, (_, offset) => {
       const at = new Date(start);
       at.setDate(at.getDate() + offset);
       return istDay(at);
     });
-  }, [firstDay]);
+  }, [firstDay, plannerDays]);
 
   /** Reloads the whole board. The fallback whenever an optimistic move is refused. */
   const reload = useCallback(async (boardId: number) => {
@@ -345,10 +347,47 @@ export default function UniverseClient({
   const writable = board ? canWrite(board) : false;
   const inboxList = board?.lists.find((list) => list.role === "inbox");
   const calendarList = board?.lists.find((list) => list.role === "calendar");
+  /**
+   * The columns to draw, with the Calendar list cut down to the Planner's days.
+   *
+   * The two are one view of one week, not two independent lists: a Calendar
+   * column holding every dated card ever synced is hundreds of prayers and
+   * appointments deep, and scrolling it to find today defeats the point of
+   * having the grid beside it. Windowed to the same days the grid is drawing,
+   * the column becomes the agenda for what you are looking at, and widening the
+   * grid to seven days widens the agenda with it.
+   *
+   * Only while the Planner is on screen. With that pane closed there is no
+   * control left that moves the window, so a filtered column would be a column
+   * whose hidden cards cannot be got back to.
+   *
+   * The filtering is for rendering only — `board` still holds every card, which
+   * is what keeps drop positions honest. Dropping onto a visible card resolves
+   * its index in the full list, so a card dragged into a windowed Calendar lands
+   * where it looks like it landed rather than at some position counted over a
+   * shorter array.
+   */
   const boardLists = useMemo(() => {
     if (!board) return [];
-    return showsInbox ? board.lists.filter((list) => list.role !== "inbox") : board.lists;
-  }, [board, showsInbox]);
+    const visible = showsInbox ? board.lists.filter((list) => list.role !== "inbox") : board.lists;
+    if (!showsPlanner) return visible;
+    return visible.map((list) =>
+      list.role === "calendar"
+        ? { ...list, cards: list.cards.filter((card) => withinDays(card, days)) }
+        : list,
+    );
+  }, [board, showsInbox, showsPlanner, days]);
+
+  /** What the windowed Calendar column says about the cards it is not showing. */
+  const listNotes = useMemo(() => {
+    if (!calendarList || !showsPlanner) return undefined;
+    const shown = boardLists.find((list) => list.id === calendarList.id)?.cards.length ?? 0;
+    const hidden = calendarList.cards.length - shown;
+    if (hidden <= 0) return undefined;
+    return {
+      [calendarList.id]: `Showing these ${days.length} days · ${hidden} on other days`,
+    };
+  }, [calendarList, boardLists, days.length, showsPlanner]);
 
   const activeCard = activeDrag?.kind === "card" && board ? findCardIn(board, activeDrag.id) : null;
 
@@ -710,6 +749,7 @@ export default function UniverseClient({
           error={calendarError}
           onShift={(delta) => setFirstDay(shiftDay(firstDay, delta))}
           onToday={() => setFirstDay(istDay(new Date()))}
+          onSpanChange={setPlannerDays}
           onOpenCard={setOpenCardId}
           onCreateAt={writable ? createAt : undefined}
         />
@@ -723,6 +763,7 @@ export default function UniverseClient({
         <BoardPane
           board={board}
           lists={boardLists}
+          listNotes={listNotes}
           onOpenCard={setOpenCardId}
           onAddCard={addCard}
           onRenameList={renameList}

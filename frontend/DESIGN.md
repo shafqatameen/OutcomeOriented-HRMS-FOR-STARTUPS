@@ -146,8 +146,22 @@ should feel like a spreadsheet, not a report.
 
 ## 6. Page application
 
-**Login** — Single centered card, `320px` wide, on the beige page. Orange
-"Sign in" button. Nothing else on the screen.
+**Login (`/login`)** — Also the app's landing page, and the only public,
+indexable route. Full `960px` measure, left-aligned: brand mark, one `h1`, a
+lead paragraph, then two columns — a dense bordered feature list on the left,
+the `320px` sign-in card on the right (sticky on desktop). Stacks on narrow
+screens with the card *first*, since a returning user should not scroll past
+the pitch to sign in.
+
+The orange rule still holds: the "Sign in" button is the only orange fill on
+the page. The brand mark is the one permitted orange text, at heading size.
+Feature rows separate with `1px` dividers — no cards, no shadows, no icons
+larger than `16px`. This page describes a product; it is not an advertisement
+for one.
+
+> This replaces the earlier "single centered card, nothing else on the screen"
+> spec. The page took on the job of explaining the app to someone who has never
+> seen it, which the bare card could not do.
 
 **Leaderboard (`/`)** — Chart card first, then the point matrix table. Chart
 lines use the categorical palette below, `2px` stroke, no area fill, no

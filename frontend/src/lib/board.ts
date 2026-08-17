@@ -40,16 +40,36 @@ export const istMinutes = (at: Date): number => {
   return hour * 60 + minute;
 };
 
-/** Day offset from today, in IST days. `0` is today, `1` tomorrow. */
-export const istDayOffset = (days: number): string => {
-  const at = new Date();
-  at.setDate(at.getDate() + days);
-  return istDay(at);
-};
-
 /** What the API wants: `YYYY-MM-DDTHH:mm:ss`, built from a wall-clock day. */
 export const dayBoundary = (day: string, endOfDay = false): string =>
   `${day}T${endOfDay ? "23:59:59" : "00:00:00"}`;
+
+/**
+ * Whether a card belongs to a window of IST days — the Planner's columns.
+ *
+ * A card with neither date is kept rather than filtered out. It cannot be drawn
+ * on the grid at all, so no window would ever bring it back, and a card that is
+ * invisible on every window is a card nobody can reach again.
+ *
+ * Dated cards are tested as the span they occupy rather than as a single day, so
+ * an appointment running from Monday into Tuesday still belongs to a window that
+ * only holds one of them — the same rule the grid itself draws by.
+ */
+export function withinDays(
+  card: Pick<BoardCard, "start_at" | "due_at">,
+  days: string[],
+): boolean {
+  if (days.length === 0) return true;
+  const start = card.start_at ? istDay(parseIst(card.start_at)) : null;
+  const due = card.due_at ? istDay(parseIst(card.due_at)) : null;
+  if (!start && !due) return true;
+
+  const a = start ?? (due as string);
+  const b = due ?? (start as string);
+  const first = a <= b ? a : b;
+  const last = a <= b ? b : a;
+  return first <= days[days.length - 1] && last >= days[0];
+}
 
 /** An API datetime as a `datetime-local` value, or "" when there is none. */
 export const toInputValue = (iso: string | null): string => (iso ? iso.slice(0, 16) : "");
@@ -102,9 +122,6 @@ export const checklistProgress = (card: BoardCard): { done: number; total: numbe
   if (card.checklist.length === 0) return null;
   return { done: card.checklist.filter((item) => item.is_done).length, total: card.checklist.length };
 };
-
-export const findList = (board: BoardView, listId: number): BoardListView | undefined =>
-  board.lists.find((list) => list.id === listId);
 
 export const findCard = (board: BoardView, cardId: number): BoardCard | undefined => {
   for (const list of board.lists) {

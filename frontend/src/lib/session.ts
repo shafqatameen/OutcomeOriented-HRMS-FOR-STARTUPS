@@ -32,11 +32,3 @@ export async function requireUser(): Promise<CurrentUser> {
   if (!user) redirect("/login");
   return user;
 }
-
-/** Guard for the admin surfaces. Checked per page, not in a layout, so it
- *  re-runs on every navigation between sibling admin routes. */
-export async function requireAdmin(): Promise<CurrentUser> {
-  const user = await getCurrentUser();
-  if (!user || user.role !== "Admin") redirect("/login");
-  return user;
-}

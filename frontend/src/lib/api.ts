@@ -197,8 +197,6 @@ export type InboxItem = { id: number; body: string; created_at: string };
 
 /** Oldest first, which is the order clarifying works through them. */
 export const getInbox = (): Promise<InboxItem[]> => fetchAPI("/inbox");
-/** Just the number, for the rail. Avoids pulling captured text into every page. */
-export const getInboxCount = (): Promise<{ count: number }> => fetchAPI("/inbox/count");
 /** One capture. Text is trimmed server-side; blank is refused, not ignored. */
 export const captureItem = (body: string): Promise<InboxItem> =>
   fetchAPI("/inbox", { method: "POST", body: JSON.stringify({ body }) });
@@ -272,8 +270,6 @@ export type WaitingItem = {
 };
 
 export const getSomeday = (): Promise<SomedayItem[]> => fetchAPI("/someday");
-export const createSomeday = (data: { title: string; notes?: string }) =>
-  fetchAPI("/someday", { method: "POST", body: JSON.stringify(data) });
 /** `reviewed: true` stamps the review time server-side; it cannot be backdated. */
 export const updateSomeday = (
   id: number,
@@ -282,20 +278,11 @@ export const updateSomeday = (
 export const deleteSomeday = (id: number) => fetchAPI(`/someday/${id}`, { method: "DELETE" });
 
 export const getReference = (): Promise<ReferenceItem[]> => fetchAPI("/reference");
-export const createReference = (data: { title: string; body: string }) =>
-  fetchAPI("/reference", { method: "POST", body: JSON.stringify(data) });
-export const updateReference = (id: number, data: { title?: string; body?: string }) =>
-  fetchAPI(`/reference/${id}`, { method: "PATCH", body: JSON.stringify(data) });
 export const deleteReference = (id: number) => fetchAPI(`/reference/${id}`, { method: "DELETE" });
 
 /** Open items only unless `includeClosed`. Longest-waiting first. */
 export const getWaiting = (includeClosed = false): Promise<WaitingItem[]> =>
   fetchAPI(`/waiting${includeClosed ? "?include_closed=true" : ""}`);
-export const createWaiting = (data: {
-  title: string; notes?: string;
-  delegate_user_id?: number | null; delegate_name?: string;
-  follow_up_date?: string | null;
-}) => fetchAPI("/waiting", { method: "POST", body: JSON.stringify(data) });
 export const updateWaiting = (
   id: number,
   data: { title?: string; notes?: string; follow_up_date?: string | null; status?: "Open" | "Closed" },
@@ -326,7 +313,6 @@ export const deleteCategory = (categoryId: number, reassignTo?: number) => {
 export const login = (email: string, password: string) =>
   fetchAPI("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
 export const logout = () => fetchAPI("/auth/logout", { method: "POST" });
-export const getMe = () => fetchAPI("/auth/me");
 
 /* --- Self-service accounts ---------------------------------------------------
  *
@@ -343,9 +329,6 @@ export const getSignupStatus = (): Promise<SignupStatus> => fetchAPI("/auth/sign
 /** Starts an account. No password here — that is chosen after the link is followed. */
 export const signup = (email: string, name?: string) =>
   fetchAPI("/auth/signup", { method: "POST", body: JSON.stringify({ email, name }) });
-
-export const resendVerification = (email: string) =>
-  fetchAPI("/auth/resend-verification", { method: "POST", body: JSON.stringify({ email }) });
 
 export const forgotPassword = (email: string) =>
   fetchAPI("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) });
@@ -428,11 +411,6 @@ export const setUserActive = (userId: number, isActive: boolean) =>
  */
 export const deleteUser = (userId: number) => fetchAPI(`/users/${userId}`, { method: "DELETE" });
 
-/** SMTP settings the backend is using, minus the password. Requires `admin.mail`. */
-export const getMailStatus = () => fetchAPI("/mail/status");
-/** Sends a diagnostic message. Omit `to` to send to your own address. */
-export const sendTestMail = (to?: string) =>
-  fetchAPI("/mail/test", { method: "POST", body: JSON.stringify({ to: to ?? null }) });
 export const getGoals = () => fetchAPI("/goals");
 export const createGoal = (data: any) => fetchAPI("/goals", { method: "POST", body: JSON.stringify(data) });
 export const updateGoal = (goalId: number, data: { title: string }) =>
@@ -507,9 +485,6 @@ export const downloadExport = ({
 
 /** Pillars with their functions nested. Feeds the panel, the task forms and seats. */
 export const getOrgTree = () => fetchAPI("/org/tree");
-export const createPillar = (data: {
-  name: string; slug: string; color_hex?: string; position?: number; is_company?: boolean;
-}) => fetchAPI("/org/pillars", { method: "POST", body: JSON.stringify(data) });
 export const createFunction = (data: {
   pillar_id: number; name: string; purpose?: string; color_hex?: string; position?: number;
 }) => fetchAPI("/org/functions", { method: "POST", body: JSON.stringify(data) });
@@ -677,23 +652,6 @@ export const createBoard = (data: {
   member_ids?: number[];
 }): Promise<BoardSummary> =>
   fetchAPI("/boards", { method: "POST", body: JSON.stringify(data) });
-export const updateBoard = (
-  boardId: number,
-  data: { name?: string; trash_purge_days?: number | null },
-): Promise<BoardSummary> =>
-  fetchAPI(`/boards/${boardId}`, { method: "PATCH", body: JSON.stringify(data) });
-/** Team boards only — your own board is refused, since it would be reseeded. */
-export const deleteBoard = (boardId: number) =>
-  fetchAPI(`/boards/${boardId}`, { method: "DELETE" });
-
-export const setBoardMember = (boardId: number, userId: number, role: string) =>
-  fetchAPI(`/boards/${boardId}/members`, {
-    method: "PUT",
-    body: JSON.stringify({ user_id: userId, role }),
-  });
-export const removeBoardMember = (boardId: number, userId: number) =>
-  fetchAPI(`/boards/${boardId}/members/${userId}`, { method: "DELETE" });
-
 export const createBoardList = (boardId: number, name: string): Promise<BoardListView> =>
   fetchAPI(`/boards/${boardId}/lists`, { method: "POST", body: JSON.stringify({ name }) });
 /** Renaming a seeded list keeps its `role`, so the Planner stays pointed at it. */
@@ -777,15 +735,6 @@ export const createCardLabel = (
   data: { color: string; name?: string | null },
 ): Promise<CardLabel> =>
   fetchAPI(`/boards/${boardId}/labels`, { method: "POST", body: JSON.stringify(data) });
-export const updateCardLabel = (
-  labelId: number,
-  data: { color?: string; name?: string | null },
-): Promise<CardLabel> =>
-  fetchAPI(`/labels/${labelId}`, { method: "PATCH", body: JSON.stringify(data) });
-/** Deletes the label and takes it off every card that carried it. */
-export const deleteCardLabel = (labelId: number) =>
-  fetchAPI(`/labels/${labelId}`, { method: "DELETE" });
-
 export const addCardComment = (cardId: number, text: string): Promise<BoardCardDetail> =>
   fetchAPI(`/cards/${cardId}/comments`, { method: "POST", body: JSON.stringify({ text }) });
 export const deleteCardComment = (commentId: number): Promise<BoardCardDetail> =>

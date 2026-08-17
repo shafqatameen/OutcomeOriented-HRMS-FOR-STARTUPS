@@ -6,7 +6,6 @@ category's default retroactively changes what its uncompleted tasks are worth -
 and moving a task between categories changes its value too, unless a custom
 value was pinned in Admin.
 """
-from typing import Optional
 
 
 def effective_points(task, category=None) -> int:

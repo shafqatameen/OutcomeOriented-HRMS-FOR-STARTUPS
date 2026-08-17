@@ -1,6 +1,16 @@
+import type { Metadata } from "next";
 import { can, requireUser } from "@/lib/session";
 import NoAccess from "@/components/NoAccess";
 import PanelClient from "../PanelClient";
+
+/**
+ * A static title, unlike the other dynamic routes. Naming the tab after the
+ * person would mean a `/users` round-trip on every panel open purely for the
+ * title — this page has no server-side read of its own to piggyback on — and it
+ * would put a colleague's name in browser history for anyone permitted to look
+ * at their panel. "Panel" is the cheaper and quieter answer.
+ */
+export const metadata: Metadata = { title: "Panel" };
 
 /**
  * Someone else's panel. Your own id lands here too if linked directly, which is
